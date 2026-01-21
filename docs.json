@@ -53,53 +53,53 @@
           {
             "group": "Getting Started",
             "pages": [
-              "dusa-tablet/index",
-              "dusa-tablet/quickstart"
+              "scripts/dusa_tablet/index",
+              "scripts/dusa_tablet/quickstart"
             ]
           },
           {
             "group": "Module Overview",
             "pages": [
-              "dusa-tablet/modules/overview"
+              "scripts/dusa_tablet/modules/overview"
             ]
           },
           {
             "group": "Shared Modules",
             "pages": [
-              "dusa-tablet/modules/shared/config",
-              "dusa-tablet/modules/shared/constants",
-              "dusa-tablet/modules/shared/debug-bridge"
+              "scripts/dusa_tablet/modules/shared/config",
+              "scripts/dusa_tablet/modules/shared/constants",
+              "scripts/dusa_tablet/modules/shared/debug-bridge"
             ]
           },
           {
             "group": "Server Modules",
             "pages": [
-              "dusa-tablet/modules/server/main",
-              "dusa-tablet/modules/server/database",
-              "dusa-tablet/modules/server/debug",
-              "dusa-tablet/modules/server/apps"
+              "scripts/dusa_tablet/modules/server/main",
+              "scripts/dusa_tablet/modules/server/database",
+              "scripts/dusa_tablet/modules/server/debug",
+              "scripts/dusa_tablet/modules/server/apps"
             ]
           },
           {
             "group": "Client Modules",
             "pages": [
-              "dusa-tablet/modules/client/main",
-              "dusa-tablet/modules/client/debug"
+              "scripts/dusa_tablet/modules/client/main",
+              "scripts/dusa_tablet/modules/client/debug"
             ]
           },
           {
             "group": "Telemetry System",
             "pages": [
-              "dusa-tablet/modules/telemetry/overview",
-              "dusa-tablet/modules/telemetry/trace",
-              "dusa-tablet/modules/telemetry/alerts",
-              "dusa-tablet/modules/telemetry/client"
+              "scripts/dusa_tablet/modules/telemetry/overview",
+              "scripts/dusa_tablet/modules/telemetry/trace",
+              "scripts/dusa_tablet/modules/telemetry/alerts",
+              "scripts/dusa_tablet/modules/telemetry/client"
             ]
           },
           {
             "group": "API Reference",
             "pages": [
-              "dusa-tablet/api-reference/introduction"
+              "scripts/dusa_tablet/api-reference/introduction"
             ]
           }
         ]
