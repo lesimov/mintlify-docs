@@ -1,0 +1,118 @@
+---
+title: "Constants"
+description: "Global constants used throughout the tablet resource"
+---
+
+# TabletConstants
+
+`shared/constants.lua` defines global constants used by both client and server modules.
+
+## Log Levels
+
+```lua
+TabletConstants.LOG_LEVELS = {
+    TRACE = 1,   -- Very detailed diagnostic
+    DEBUG = 2,   -- Debug messages
+    INFO = 3,    -- Information (default)
+    WARN = 4,    -- Warnings
+    ERROR = 5,   -- Errors
+    FATAL = 6    -- Critical errors (always logged)
+}
+```
+
+### Log Level Colors
+
+FiveM console colors for each log level:
+
+| Level | Color Code | Appearance |
+|-------|------------|------------|
+| TRACE | `^7` | Gray |
+| DEBUG | `^5` | Cyan |
+| INFO | `^2` | Green |
+| WARN | `^3` | Yellow |
+| ERROR | `^1` | Red |
+| FATAL | `^1^*` | Bold Red |
+
+## Debug Categories
+
+Available categories for filtering debug output:
+
+```lua
+TabletConstants.DEBUG_CATEGORIES = {
+    'CORE',
+    'UI',
+    'NETWORK',
+    'DATABASE',
+    'APP',
+    'CUSTOM_APP',
+    'TELEMETRY',
+    'NUI',
+    'CROSS_RESOURCE',
+    'SCRIPT_ERROR',
+}
+```
+
+## KVP Storage Keys
+
+Keys used for persistent storage via FiveM's KVP system:
+
+```lua
+TabletConstants.KVP_KEYS = {
+    DEBUG_LEVEL = 'dusa_tablet:debug_level',
+    DEBUG_CATEGORIES = 'dusa_tablet:debug_categories',
+    SESSION_ID = 'dusa_tablet:session_id',
+    TELEMETRY_ENABLED = 'dusa_tablet:telemetry_enabled',
+    TELEMETRY_CONTACT = 'dusa_tablet:telemetry_contact',
+}
+```
+
+## NUI Events
+
+Event names for NUI communication:
+
+```lua
+TabletConstants.NUI_EVENTS = {
+    -- Tablet visibility
+    SET_VISIBLE = 'setVisible',
+    CLOSE_TABLET = 'closeTablet',
+
+    -- Debug
+    DEBUG_LOG = 'debug:log',
+    DEBUG_CLEAR = 'debug:clear',
+    DEBUG_CROSS_RESOURCE_ERROR = 'debug:crossResourceError',
+
+    -- Custom Apps
+    REGISTER_APP = 'customApp:register',
+    UNREGISTER_APP = 'customApp:unregister',
+    OPEN_CUSTOM_APP = 'customApp:open',
+    CLOSE_CUSTOM_APP = 'customApp:close',
+    CUSTOM_APP_MESSAGE = 'customApp:message',
+}
+```
+
+## Resource Information
+
+Auto-populated resource metadata:
+
+```lua
+TabletConstants.RESOURCE_NAME = GetCurrentResourceName()
+TabletConstants.RESOURCE_VERSION = GetResourceMetadata(GetCurrentResourceName(), 'version', 0)
+```
+
+## Usage Example
+
+```lua
+-- Check log level
+if currentLevel >= TabletConstants.LOG_LEVELS.ERROR then
+    -- Handle error
+end
+
+-- Use NUI event
+SendNUIMessage({
+    action = TabletConstants.NUI_EVENTS.SET_VISIBLE,
+    data = true
+})
+
+-- Store persistent data
+SetResourceKvp(TabletConstants.KVP_KEYS.DEBUG_LEVEL, tostring(level))
+```

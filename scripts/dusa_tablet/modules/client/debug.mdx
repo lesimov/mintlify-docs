@@ -1,0 +1,229 @@
+---
+title: "Client Debug"
+description: "Client-side logging and error capture"
+---
+
+# TabletLogger (Client)
+
+`client/debug/logger.lua` provides client-side logging with NUI integration and error capture.
+
+## Global Table
+
+```lua
+TabletLogger = TabletLogger or {}
+```
+
+## Log Methods
+
+```lua
+TabletLogger.trace(category, message, data)
+TabletLogger.debug(category, message, data)
+TabletLogger.info(category, message, data)
+TabletLogger.warn(category, message, data)
+TabletLogger.error(category, message, data)
+TabletLogger.fatal(category, message, data)
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `category` | string | Log category for filtering |
+| `message` | string | Log message |
+| `data` | table? | Optional data object |
+
+**Example:**
+
+```lua
+TabletLogger.info('UI', 'App opened', { appId = 'mail' })
+TabletLogger.error('NETWORK', 'Callback failed', { error = err })
+```
+
+## Log Flow
+
+```
+TabletLogger.info()
+  → Console print (colored)
+  → SendNUIMessage (debug panel)
+  → TriggerServerEvent (if level >= DEBUG)
+```
+
+## Configuration
+
+### Set Log Level
+
+```lua
+TabletLogger.setLevel('DEBUG')
+-- Levels: TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+```
+
+### Set Categories
+
+```lua
+TabletLogger.setCategories({'UI', 'NETWORK'})
+-- Empty array = all categories enabled
+```
+
+### Get Settings
+
+```lua
+local level = TabletLogger.getLevel()
+local categories = TabletLogger.getCategories()
+```
+
+## Performance Timers
+
+Measure operation duration:
+
+```lua
+-- Start timer
+TabletLogger.startTimer('loadApp')
+
+-- ... do work ...
+
+-- End timer (auto-logs result)
+local elapsed = TabletLogger.endTimer('loadApp', 'UI')
+-- Logs: "Timer [loadApp] took 150ms"
+-- Warns if > 100ms
+```
+
+## NUI Log Handler
+
+Handle logs from NUI (React):
+
+```lua
+TabletLogger.handleNuiLog(nuiEntry)
+```
+
+Called automatically via NUI callback:
+
+```lua
+RegisterNUICallback('debug:log', function(data, cb)
+    TabletLogger.handleNuiLog(data)
+    cb('ok')
+end)
+```
+
+## Native Error Capture
+
+Automatically captures FiveM script errors:
+
+```lua
+AddEventHandler('onResourceError', function(resourceName, errorMessage, errorTrace)
+    -- Logs to tablet debug panel
+    -- Sends to server for storage
+end)
+```
+
+### Error Capture Configuration
+
+Configure which resources' errors to capture:
+
+```lua
+Config.ErrorCapture = {
+    Enabled = true,
+    CaptureAll = false,  -- Capture all resources
+    Resources = {        -- Whitelist if CaptureAll = false
+        'dusa_tablet',
+        'mechanic-spec'
+    }
+}
+```
+
+## Safe Call Wrapper
+
+Execute code with automatic error capture:
+
+```lua
+local result, error = TabletLogger.safeCall(function()
+    -- Potentially failing code
+    return someValue
+end, 'CATEGORY', { context = 'additional data' })
+
+if not result then
+    print('Error:', error)
+end
+```
+
+## Cross-Resource Integration
+
+### Receive Server Logs
+
+```lua
+RegisterNetEvent('dusa_tablet:debug:log', function(logEntry)
+    -- Forward to NUI debug panel
+    SendNUIMessage({
+        action = Constants.NUI_EVENTS.DEBUG_LOG,
+        data = logEntry
+    })
+end)
+```
+
+### Receive External Logs
+
+```lua
+RegisterNetEvent('dusa_tablet:debug:externalClientLog', function(logEntry)
+    -- Display in debug panel
+end)
+```
+
+### Cross-Resource Errors
+
+```lua
+RegisterNetEvent('dusa_tablet:debug:crossResourceError', function(errorData)
+    -- Show error notification in tablet
+end)
+```
+
+## Exports
+
+```lua
+exports('getLogger', function() return TabletLogger end)
+exports('getDebugLevel', function() return currentLogLevel end)
+exports('setDebugLevel', function(level) TabletLogger.setLevel(level) end)
+exports('getDebugCategories', function() return enabledCategories end)
+```
+
+## Console Output Format
+
+Logs are color-coded in the FiveM client console:
+
+```
+[CLIENT] [INFO] [12:34:56.789] [UI] App opened | Data: {"appId":"mail"}
+```
+
+| Part | Description |
+|------|-------------|
+| `[CLIENT]` or `[NUI]` | Source side |
+| `[INFO]` | Log level (colored) |
+| `[12:34:56.789]` | Timestamp |
+| `[UI]` | Category |
+| `App opened` | Message |
+| `Data: {...}` | Optional JSON data |
+
+## Storage
+
+Settings persist via KVP:
+
+```lua
+-- Stored keys
+'dusa_tablet:debug_level'      -- Log level number
+'dusa_tablet:debug_categories' -- JSON array of categories
+'dusa_tablet:session_id'       -- Unique session identifier
+```
+
+## Initialization
+
+On resource start:
+
+```lua
+CreateThread(function()
+    -- Load stored level
+    local storedLevel = GetResourceKvpString('dusa_tablet:debug_level')
+
+    -- Load stored categories
+    local storedCats = GetResourceKvpString('dusa_tablet:debug_categories')
+
+    TabletLogger.info('CORE', 'Debug system initialized')
+end)
+```

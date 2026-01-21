@@ -1,0 +1,140 @@
+---
+title: "Telemetry Overview"
+description: "Operation tracing and anomaly detection system"
+---
+
+# Telemetry System
+
+The telemetry system is an **optional drop-in module** that provides:
+
+- Operation tracing (NUI → Client → Server → Database)
+- Discord alerts for errors and anomalies
+- Anomaly detection (error spikes, slow operations)
+- Historical trace storage
+- Real-time dashboard
+
+## Architecture
+
+```
+telemetry/
+├── config.lua                 # Telemetry configuration
+├── shared/
+│   └── constants.lua          # Trace constants
+├── server/
+│   ├── trace.lua              # Core tracing engine
+│   ├── storage.lua            # MySQL storage
+│   ├── hooks.lua              # Callback hooks
+│   ├── alerts.lua             # Discord alerts
+│   ├── dashboard_api.lua      # Dashboard API
+│   ├── init.lua               # Initialization
+│   └── json_exporter.lua      # JSON export
+└── client/
+    ├── trace_client.lua       # Client-side tracing
+    └── dashboard_nui.lua      # Dashboard NUI bridge
+```
+
+## Quick Start
+
+### Basic Usage
+
+```lua
+-- Server-side: Start a trace
+local traceId = DusaTrace.start('SEND_MESSAGE', { playerId = source })
+
+-- Add steps as operation progresses
+DusaTrace.addStep(traceId, 'VALIDATED', 'SERVER', { valid = true })
+DusaTrace.addStep(traceId, 'DATABASE_INSERT', 'DATABASE', { rows = 1 })
+
+-- End trace
+DusaTrace.end_(traceId, 'SUCCESS', { messageId = 123 })
+```
+
+### Client-Side Tracing
+
+```lua
+-- Client: Start trace for NUI action
+local traceId = DusaTraceClient.start('SEND_MESSAGE')
+DusaTraceClient.addStep(traceId, 'NUI_CLICKED', { button = 'send' })
+
+-- Include traceId in server callback
+local result = lib.callback.await('tablet:sendMessage', false, {
+    _traceId = traceId,
+    message = data.message
+})
+
+DusaTraceClient.end_(traceId, result.success and 'SUCCESS' or 'ERROR')
+```
+
+## Configuration
+
+Edit `telemetry/config.lua`:
+
+```lua
+DusaTraceConfig = {
+    Tracing = {
+        Enabled = true,
+        SilentMode = false,    -- Suppress startup messages
+        DebugMode = false,     -- Verbose logging
+    },
+
+    Storage = {
+        Enabled = true,
+        RetentionDays = 30,    -- Keep traces for 30 days
+    },
+
+    Alerts = {
+        Enabled = true,
+        DiscordWebhook = 'YOUR_WEBHOOK_URL',
+        AnomalyDetection = true,
+        SlowOperationAlerts = true,
+    },
+
+    Dashboard = {
+        Enabled = true,
+        AdminOnly = true,
+        Command = 'telemetry',  -- /telemetry to open
+        Keybind = 'F10',
+    }
+}
+```
+
+## Features
+
+<CardGroup cols={2}>
+
+<Card title="Trace Engine" icon="route" href="/modules/telemetry/trace">
+  Core tracing functionality for tracking operations.
+</Card>
+
+<Card title="Alerts" icon="bell" href="/modules/telemetry/alerts">
+  Discord webhooks and anomaly detection.
+</Card>
+
+<Card title="Storage" icon="database" href="/modules/telemetry/storage">
+  MySQL storage for historical traces.
+</Card>
+
+<Card title="Dashboard" icon="chart-line" href="/modules/telemetry/dashboard">
+  Real-time monitoring dashboard.
+</Card>
+
+</CardGroup>
+
+## Removal
+
+To remove the telemetry system:
+
+1. Delete the `telemetry/` folder
+2. Remove telemetry lines from `fxmanifest.lua`
+3. Restart the resource
+
+<Note>
+All `DusaTrace` calls become no-ops when the module is removed - no code changes required.
+</Note>
+
+## Dependencies
+
+The telemetry system requires:
+
+- `oxmysql` for trace storage
+- Discord webhook for alerts (optional)

@@ -1,0 +1,104 @@
+---
+title: "Introduction"
+description: "Complete documentation for dusa_tablet - iPad-style tablet interface for FiveM"
+---
+
+# DUSA Tablet
+
+Welcome to the documentation for **dusa_tablet** - a framework-agnostic iPad-style tablet interface for FiveM.
+
+{/* TODO: Add your hero image - example: <img src="/images/dusa-tablet-hero.png" alt="DUSA Tablet interface preview" /> */}
+
+## Features
+
+- **iPad OS Style UI** - Modern React-based interface
+- **Framework Agnostic** - Works with QBCore, ESX, and custom frameworks via `dusa_bridge`
+- **Built-in Apps** - Mail, News, Camera, Messages (phone sync), Maps, YouTube
+- **Custom Apps** - Register custom apps from external resources
+- **Telemetry** - Optional operation tracing and anomaly detection
+- **i18n Support** - Full localization support
+
+## Quick Start
+
+<CardGroup cols={2}>
+
+<Card title="Installation" icon="download" href="/quickstart">
+  Get dusa_tablet up and running on your server.
+</Card>
+
+<Card title="Configuration" icon="gear" href="/modules/shared/config">
+  Configure tablet settings, apps, and features.
+</Card>
+
+<Card title="Module Overview" icon="cubes" href="/modules/overview">
+  Understand the tablet's modular architecture.
+</Card>
+
+<Card title="API Reference" icon="code" href="/api-reference/introduction">
+  Client and server exports, callbacks, and events.
+</Card>
+
+</CardGroup>
+
+## Architecture
+
+```
+dusa_tablet/
+├── config/           # Configuration (escrow-ignored)
+├── shared/           # Shared modules
+├── server/           # Server-side logic
+│   ├── debug/        # Logging & telemetry
+│   ├── database/     # Migrations & queries
+│   └── apps/         # Mail, News, Camera, Messages
+├── client/           # Client-side logic
+├── telemetry/        # Optional tracing system
+└── web/              # React NUI (dist/)
+```
+
+## Dependencies
+
+| Resource | Purpose |
+|----------|---------|
+| `ox_lib` | Callbacks, locale, keybinds |
+| `dusa_bridge` | Framework-agnostic operations |
+| `oxmysql` | Database operations |
+
+## Built-in Apps
+
+| App | Description |
+|-----|-------------|
+| **Mail** | Email system with threads and attachments |
+| **News** | News articles by category |
+| **Camera** | Screenshot capture via Discord |
+| **Messages** | Phone SMS sync (lb-phone, qb-phone, etc.) |
+| **Maps** | GTA map with POI markers |
+| **YouTube** | Video playback via Invidious API |
+| **Settings** | User preferences |
+| **Calculator** | Basic calculator |
+| **Clock** | World clock and timers |
+
+## Custom Apps
+
+External resources can register custom apps:
+
+```lua
+-- In your resource
+exports['dusa_tablet']:RegisterApp({
+    id = 'myapp',
+    name = 'My App',
+    icon = 'myapp.svg',
+    ui = {
+        type = 'iframe',
+        url = 'https://nui-myapp/index.html'
+    },
+    permissions = {
+        job = 'police'
+    }
+})
+```
+
+## Support
+
+<Card title="GitHub Issues" icon="github" href="https://github.com/Dusa-DD/dusa_tablet/issues">
+  Report bugs or request features.
+</Card>

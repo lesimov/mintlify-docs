@@ -1,0 +1,228 @@
+---
+title: 'API Reference'
+description: 'Complete API documentation for dusa_tablet exports, callbacks, and events'
+---
+
+# API Reference
+
+This section documents all public APIs for integrating with dusa_tablet.
+
+## Client Exports
+
+Core tablet control exports:
+
+```lua
+-- Open/Close
+exports['dusa_tablet']:Open()
+exports['dusa_tablet']:Close()
+exports['dusa_tablet']:Toggle()
+exports['dusa_tablet']:IsOpen()  -- Returns boolean
+
+-- Visibility Control
+exports['dusa_tablet']:HideTablet()    -- Temporarily hide (for minigames)
+exports['dusa_tablet']:ShowTablet()    -- Restore from hidden
+exports['dusa_tablet']:GetTabletState() -- Returns 'closed', 'open', or 'hidden'
+
+-- Language
+exports['dusa_tablet']:GetCurrentLocale()  -- Returns locale code
+```
+
+## Server Exports
+
+Custom app registration:
+
+```lua
+-- Register custom app
+exports['dusa_tablet']:RegisterApp({
+    id = 'myapp',
+    name = 'My App',
+    icon = 'myapp.svg',
+    permissions = { job = 'police' }
+})
+
+-- Unregister app
+exports['dusa_tablet']:UnregisterApp('myapp')
+
+-- Get all registered apps
+local apps = exports['dusa_tablet']:GetRegisteredApps()
+```
+
+## Custom Apps
+
+<CardGroup cols={2}>
+
+<Card title="Client Registration" icon="display" href="/api-reference/custom-apps#client">
+  Register apps from client-side with UI configuration.
+</Card>
+
+<Card title="Server Registration" icon="server" href="/api-reference/custom-apps#server">
+  Register apps from server-side with permissions.
+</Card>
+
+</CardGroup>
+
+### Client-Side Registration
+
+```lua
+exports['dusa_tablet']:RegisterApp({
+    id = 'mechanic',
+    name = 'Mechanic Panel',
+    icon = 'mechanic.svg',
+    ui = {
+        type = 'iframe',
+        url = 'https://cfx-nui-mechanic-spec/dist/index.html'
+    },
+    permissions = {
+        job = 'mechanic'
+    },
+    onOpen = function()
+        print('Mechanic app opened')
+    end,
+    onClose = function()
+        print('Mechanic app closed')
+    end
+})
+```
+
+### Server-Side Registration
+
+```lua
+exports['dusa_tablet']:RegisterApp({
+    id = 'police-mdt',
+    name = 'Police MDT',
+    icon = 'police.svg',
+    permissions = {
+        job = {'police', 'sheriff'}
+    }
+})
+```
+
+## Callbacks (lib.callback)
+
+### Server Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `tablet:getUserInfo` | Get player name |
+| `tablet:maps:getPOI` | Get map points of interest |
+| `dusa_tablet:getServerApps` | Get registered server apps |
+| `dusa_tablet:checkPermission` | Check app permission |
+
+### Mail Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `tablet:mail:register` | Register email address |
+| `tablet:mail:getUser` | Get current mail user |
+| `tablet:mail:getThreads` | Get mail threads |
+| `tablet:mail:send` | Send email |
+| `tablet:mail:reply` | Reply to thread |
+
+### News Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `tablet:news:getChannels` | Get news channels |
+| `tablet:news:getArticles` | Get articles |
+| `tablet:news:createArticle` | Create article |
+
+### Messages Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `tablet:messages:getSyncStatus` | Check phone sync status |
+| `tablet:messages:getConversations` | Get SMS conversations |
+| `tablet:messages:sendMessage` | Send SMS |
+
+## Events
+
+### Client Events
+
+```lua
+-- Open tablet from item
+RegisterNetEvent('dusa_tablet:openFromItem', function()
+    -- Opens tablet
+end)
+
+-- Sync server-registered app
+RegisterNetEvent('dusa_tablet:syncApp', function(appData)
+    -- Receives new app registration
+end)
+
+-- Remove server-registered app
+RegisterNetEvent('dusa_tablet:removeApp', function(appId)
+    -- Removes app
+end)
+```
+
+### Server Events
+
+```lua
+-- Restart resource (dev only)
+RegisterServerEvent('dusa_tablet:RestartScript')
+```
+
+## NUI Messages
+
+### From Lua to NUI
+
+```lua
+SendNUIMessage({
+    action = 'setVisible',
+    data = true
+})
+
+SendNUIMessage({
+    action = 'showTabletNotification',
+    data = {
+        app = 'Mail',
+        title = 'New Email',
+        description = 'You have 3 unread messages',
+        time = 'now'
+    }
+})
+```
+
+### From NUI to Lua
+
+```typescript
+// Close tablet
+fetchNui('closeTablet', {});
+
+// Show notification
+fetchNui('tablet:showNotification', {
+    app: 'System',
+    title: 'Alert',
+    description: 'Something happened',
+    time: 'now'
+});
+
+// Change language
+fetchNui('tablet:setLocale', {
+    locale: 'tr'
+});
+```
+
+## Permission Structure
+
+```lua
+-- Job-based
+permissions = {
+    job = 'police'              -- Single job
+}
+
+permissions = {
+    job = {'police', 'sheriff'} -- Multiple jobs
+}
+
+-- Gang-based
+permissions = {
+    gang = 'ballas'
+}
+
+-- Combined (any match)
+permissions = {
+    job = 'mechanic',
+    gang = 'lostmc'
+}
+```

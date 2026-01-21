@@ -1,0 +1,201 @@
+---
+title: "Server Main"
+description: "Main server-side entry point and core functionality"
+---
+
+# TabletServer
+
+`server/main.lua` is the main server-side entry point that handles core tablet functionality.
+
+## Global Table
+
+```lua
+TabletServer = TabletServer or {}
+```
+
+## Item Registration
+
+When `OpenMethod` is set to `'item'`, the tablet item is automatically registered:
+
+```lua
+-- Automatically registered when Config.Tablet.OpenMethod == 'item'
+Framework.CreateUseableItem(itemName, function(source, usedItemName, _itemData)
+    if Config.Tablet.Item.Remove then
+        Framework.RemoveItem(source, usedItemName, 1)
+    end
+    TriggerClientEvent('dusa_tablet:openFromItem', source)
+end)
+```
+
+## Custom App Registry
+
+### TabletServer.RegisterApp
+
+Register a custom app from another resource:
+
+```lua
+TabletServer.RegisterApp(appData)
+```
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique app identifier |
+| `name` | string | Yes | Display name |
+| `icon` | string | No | Icon filename (default: `'default.svg'`) |
+| `permissions` | table | No | Permission requirements |
+
+**Example:**
+
+```lua
+-- In external resource
+exports['dusa_tablet']:RegisterApp({
+    id = 'mechanic',
+    name = 'Mechanic Panel',
+    icon = 'mechanic.svg',
+    permissions = {
+        job = 'mechanic'
+    }
+})
+```
+
+### TabletServer.UnregisterApp
+
+Remove a registered app:
+
+```lua
+TabletServer.UnregisterApp(appId)
+```
+
+### TabletServer.GetRegisteredApps
+
+Get all registered server-side apps:
+
+```lua
+local apps = TabletServer.GetRegisteredApps()
+```
+
+## Callbacks
+
+### dusa_tablet:getServerApps
+
+Get all server-registered apps:
+
+```lua
+lib.callback.register('dusa_tablet:getServerApps', function(source)
+    return serverRegisteredApps
+end)
+```
+
+### tablet:getUserInfo
+
+Get player information from framework:
+
+```lua
+lib.callback.register('tablet:getUserInfo', function(source)
+    return {
+        success = true,
+        firstName = 'John',
+        lastName = 'Doe',
+        fullName = 'John Doe'
+    }
+end)
+```
+
+### tablet:maps:getPOI
+
+Get Points of Interest for Maps app:
+
+```lua
+lib.callback.register('tablet:maps:getPOI', function(source)
+    return {
+        success = true,
+        pois = Config.MapsPOI or {}
+    }
+end)
+```
+
+### dusa_tablet:checkPermission
+
+Check if player has permission for an app:
+
+```lua
+lib.callback.register('dusa_tablet:checkPermission', function(source, appId, permission)
+    -- Checks job/gang permissions
+    return true/false
+end)
+```
+
+**Permission Types:**
+
+```lua
+-- Job-based
+{ job = 'police' }           -- Single job
+{ job = {'police', 'ems'} }  -- Multiple jobs
+
+-- Gang-based
+{ gang = 'ballas' }
+{ gang = {'ballas', 'grove'} }
+```
+
+## YouTube Proxy
+
+Server-side YouTube API proxy using Invidious instances to bypass CORS:
+
+### Available Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `tablet:youtube:getChannelVideos` | Get videos from a channel |
+| `tablet:youtube:getTrending` | Get trending videos by region |
+| `tablet:youtube:search` | Search for videos |
+| `tablet:youtube:getVideoDetails` | Get video details |
+
+### Invidious Instance Failover
+
+The system automatically rotates through multiple Invidious instances:
+
+```lua
+local INVIDIOUS_INSTANCES = {
+    'https://inv.tux.pizza',
+    'https://yt.artemislena.eu',
+    -- ... more instances
+}
+```
+
+## Events
+
+### dusa_tablet:RestartScript
+
+Developer event to restart the resource:
+
+```lua
+RegisterServerEvent('dusa_tablet:RestartScript')
+```
+
+<Warning>
+This event should only be used in development. It's triggered by the dev restart keybind.
+</Warning>
+
+## Exports
+
+```lua
+exports('RegisterApp', TabletServer.RegisterApp)
+exports('UnregisterApp', TabletServer.UnregisterApp)
+exports('GetRegisteredApps', TabletServer.GetRegisteredApps)
+```
+
+## Player Events
+
+The server tracks player connections for logging:
+
+```lua
+AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
+    -- Logs player connection
+end)
+
+AddEventHandler('playerDropped', function(reason)
+    -- Logs player disconnect
+end)
+```

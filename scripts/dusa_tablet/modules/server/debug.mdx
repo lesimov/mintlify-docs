@@ -1,0 +1,238 @@
+---
+title: "Server Debug"
+description: "Server-side logging, telemetry, and HTTP handlers"
+---
+
+# Server Debug System
+
+The server debug system provides comprehensive logging, telemetry integration, and debug panel HTTP endpoints.
+
+## Files
+
+- `server/debug/logger.lua` - Main logger
+- `server/debug/telemetry.lua` - Telemetry integration
+- `server/debug/http.lua` - HTTP endpoints
+
+---
+
+## ServerLogger
+
+`server/debug/logger.lua` provides the main logging functionality.
+
+### Global Table
+
+```lua
+ServerLogger = ServerLogger or {}
+```
+
+### Log Methods
+
+```lua
+ServerLogger.trace(category, message, data)
+ServerLogger.debug(category, message, data)
+ServerLogger.info(category, message, data)
+ServerLogger.warn(category, message, data)
+ServerLogger.error(category, message, data)
+ServerLogger.fatal(category, message, data)
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `category` | string | Log category (e.g., 'CORE', 'DATABASE') |
+| `message` | string | Log message |
+| `data` | table? | Optional additional data |
+
+**Example:**
+
+```lua
+ServerLogger.info('DATABASE', 'Connected to MySQL')
+ServerLogger.error('NETWORK', 'Failed to send message', { error = err })
+```
+
+### Log Buffering
+
+Logs are buffered and can be retrieved for the debug panel:
+
+```lua
+-- Get recent logs (last 100 by default)
+local logs = ServerLogger.getRecentLogs(limit)
+
+-- Clear log buffer
+ServerLogger.clearBuffer()
+```
+
+### Configuration
+
+```lua
+-- Set log level
+ServerLogger.setLevel('DEBUG')  -- TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+
+-- Set enabled categories
+ServerLogger.setCategories({'CORE', 'DATABASE'})  -- Empty = all
+
+-- Get current settings
+local level = ServerLogger.getLevel()
+local categories = ServerLogger.getCategories()
+```
+
+---
+
+## ServerTelemetry
+
+`server/debug/telemetry.lua` integrates with the optional telemetry system.
+
+### Integration Points
+
+```lua
+-- On ERROR+ logs, automatically creates telemetry span
+ServerLogger.error('CATEGORY', 'Message')
+-- → Triggers DusaTraceAlerts.onLogError if telemetry enabled
+```
+
+### Manual Telemetry
+
+```lua
+-- Start a trace
+local traceId = ServerTelemetry.startTrace('OPERATION_NAME', {
+    playerId = source
+})
+
+-- Add step
+ServerTelemetry.addStep(traceId, 'STEP_NAME', { data = value })
+
+-- End trace
+ServerTelemetry.endTrace(traceId, 'SUCCESS', { result = data })
+```
+
+---
+
+## HTTP Debug Endpoints
+
+`server/debug/http.lua` provides HTTP endpoints for external debug tools.
+
+### GET /logs
+
+Retrieve recent logs:
+
+```bash
+curl http://localhost:30120/dusa_tablet/logs
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "timestamp": "12:34:56.789",
+      "level": 3,
+      "levelName": "INFO",
+      "category": "CORE",
+      "message": "Server initialized"
+    }
+  ]
+}
+```
+
+### GET /status
+
+Get resource status:
+
+```bash
+curl http://localhost:30120/dusa_tablet/status
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "status": {
+    "resource": "dusa_tablet",
+    "version": "1.0.6",
+    "uptime": 3600,
+    "logLevel": 3,
+    "telemetryEnabled": true
+  }
+}
+```
+
+### POST /level
+
+Set log level (requires auth):
+
+```bash
+curl -X POST http://localhost:30120/dusa_tablet/level \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{"level": "DEBUG"}'
+```
+
+---
+
+## Events
+
+### dusa_tablet:debug:clientLog
+
+Receive logs from client:
+
+```lua
+RegisterNetEvent('dusa_tablet:debug:clientLog', function(entry)
+    -- Store and process client log
+end)
+```
+
+### dusa_tablet:debug:requestLogs
+
+Client requesting stored logs:
+
+```lua
+RegisterNetEvent('dusa_tablet:debug:requestLogs', function()
+    TriggerClientEvent('dusa_tablet:debug:bulkLogs', source, storedLogs)
+end)
+```
+
+---
+
+## Cross-Resource Logging
+
+External resources can send logs:
+
+```lua
+-- From external resource
+TriggerServerEvent('dusa_tablet:debug:externalLog', {
+    level = 3,
+    levelName = 'INFO',
+    category = 'MECHANIC',
+    message = 'Order completed',
+    resource = GetCurrentResourceName()
+})
+```
+
+---
+
+## Best Practices
+
+<Tip>
+Use appropriate log levels:
+- **TRACE**: Very detailed debugging
+- **DEBUG**: Development debugging
+- **INFO**: Normal operations
+- **WARN**: Potential issues
+- **ERROR**: Failures that need attention
+- **FATAL**: Critical failures
+</Tip>
+
+<Warning>
+Avoid logging sensitive data like passwords, tokens, or full player identifiers in production.
+</Warning>
+
+```lua
+-- WRONG
+ServerLogger.info('AUTH', 'User logged in', { password = pwd })
+
+-- CORRECT
+ServerLogger.info('AUTH', 'User logged in', { userId = player.Identifier:sub(-8) })
+```

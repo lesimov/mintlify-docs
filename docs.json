@@ -48,6 +48,63 @@
         ]
       },
       {
+        "tab": "DUSA Tablet",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "dusa-tablet/index",
+              "dusa-tablet/quickstart"
+            ]
+          },
+          {
+            "group": "Module Overview",
+            "pages": [
+              "dusa-tablet/modules/overview"
+            ]
+          },
+          {
+            "group": "Shared Modules",
+            "pages": [
+              "dusa-tablet/modules/shared/config",
+              "dusa-tablet/modules/shared/constants",
+              "dusa-tablet/modules/shared/debug-bridge"
+            ]
+          },
+          {
+            "group": "Server Modules",
+            "pages": [
+              "dusa-tablet/modules/server/main",
+              "dusa-tablet/modules/server/database",
+              "dusa-tablet/modules/server/debug",
+              "dusa-tablet/modules/server/apps"
+            ]
+          },
+          {
+            "group": "Client Modules",
+            "pages": [
+              "dusa-tablet/modules/client/main",
+              "dusa-tablet/modules/client/debug"
+            ]
+          },
+          {
+            "group": "Telemetry System",
+            "pages": [
+              "dusa-tablet/modules/telemetry/overview",
+              "dusa-tablet/modules/telemetry/trace",
+              "dusa-tablet/modules/telemetry/alerts",
+              "dusa-tablet/modules/telemetry/client"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "dusa-tablet/api-reference/introduction"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {

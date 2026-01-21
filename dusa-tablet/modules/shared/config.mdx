@@ -1,0 +1,177 @@
+---
+title: "Configuration"
+description: "Main configuration options for dusa_tablet"
+---
+
+# Config
+
+`config/config.lua` is the main configuration file for the tablet resource. This file is **escrow ignored** and can be modified by server owners.
+
+## General Settings
+
+```lua
+Config.General = {
+    Debug = false,           -- Enable debug mode
+    DebugLevel = 3,          -- Default log level (3 = INFO)
+    Locale = 'en',           -- Default language
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Debug` | boolean | `false` | Enable verbose debugging |
+| `DebugLevel` | number | `3` | Default log level (1-6) |
+| `Locale` | string | `'en'` | Default language code |
+
+## Tablet Settings
+
+```lua
+Config.Tablet = {
+    OpenMethod = 'keybind',  -- 'keybind', 'command', or 'item'
+
+    -- Keybind settings
+    Keybind = {
+        Key = 'TAB',
+        Description = 'Open Tablet'
+    },
+
+    -- Command settings
+    Command = {
+        Name = 'tablet'
+    },
+
+    -- Item settings
+    Item = {
+        Name = 'tablet',
+        Remove = false       -- Remove item after use?
+    },
+
+    -- Restrictions
+    AllowInVehicle = false,
+    AllowWhileDead = false,
+
+    -- Animation
+    Animation = {
+        Enabled = true,
+        Dict = 'amb@world_human_seat_wall_tablet@female@base',
+        Anim = 'base',
+        Prop = 'prop_cs_tablet',
+        Bone = 28422,
+        Offset = { x = 0.0, y = 0.0, z = 0.0 },
+        Rotation = { x = 0.0, y = 0.0, z = 0.0 },
+        Flags = 49
+    }
+}
+```
+
+### Open Methods
+
+<Tabs>
+  <Tab title="Keybind">
+    Uses `ox_lib` keybind system. Players can rebind in FiveM settings.
+    ```lua
+    Config.Tablet.OpenMethod = 'keybind'
+    Config.Tablet.Keybind.Key = 'TAB'
+    ```
+  </Tab>
+  <Tab title="Command">
+    Opens tablet via chat command.
+    ```lua
+    Config.Tablet.OpenMethod = 'command'
+    Config.Tablet.Command.Name = 'tablet'  -- /tablet
+    ```
+  </Tab>
+  <Tab title="Item">
+    Requires using an inventory item to open.
+    ```lua
+    Config.Tablet.OpenMethod = 'item'
+    Config.Tablet.Item.Name = 'tablet'
+    Config.Tablet.Item.Remove = false  -- Keep item after use
+    ```
+  </Tab>
+</Tabs>
+
+## Custom Apps
+
+```lua
+Config.CustomApps = {
+    Enabled = true,
+    MaxApps = 20
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `Enabled` | boolean | `true` | Allow custom app registration |
+| `MaxApps` | number | `20` | Maximum custom apps allowed |
+
+## Developer Mode
+
+```lua
+Config.Dev = {
+    Enabled = false,
+    RestartKey = 'F10'
+}
+```
+
+<Warning>
+Only enable developer mode in development environments. The restart key will allow quick resource restarts.
+</Warning>
+
+## Error Capture
+
+```lua
+Config.ErrorCapture = {
+    Enabled = true,
+    CaptureAll = false,
+    Resources = {
+        'dusa_tablet',
+        'mechanic-spec'
+    }
+}
+```
+
+## Maps POI
+
+Define Points of Interest for the Maps app:
+
+```lua
+Config.MapsPOI = {
+    {
+        id = 'hospital_pillbox',
+        name = 'Pillbox Hospital',
+        category = 'medical',
+        x = 311.0,
+        y = -590.0,
+        icon = 'hospital'
+    },
+    -- ... more POIs
+}
+```
+
+## Camera Configuration
+
+```lua
+Config.Camera = {
+    Provider = 'discord',
+    Webhook = ''  -- Discord webhook URL for screenshots
+}
+```
+
+<Note>
+The camera app requires `screenshot-basic` resource and a Discord webhook for image uploads.
+</Note>
+
+## Database Settings
+
+```lua
+Config.Database = {
+    AutoMigration = true,
+    Prefix = 'tablet_'
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `AutoMigration` | boolean | `true` | Auto-run migrations on start |
+| `Prefix` | string | `'tablet_'` | Table name prefix |

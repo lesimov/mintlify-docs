@@ -1,0 +1,247 @@
+---
+title: "Client Tracing"
+description: "Client-side trace helpers for NUI-to-server propagation"
+---
+
+# DusaTraceClient
+
+`telemetry/client/trace_client.lua` provides client-side trace helpers for NUI → Server propagation.
+
+## Global Table
+
+```lua
+DusaTraceClient = DusaTraceClient or {}
+```
+
+## Core API
+
+### DusaTraceClient.start
+
+Start a new client-side trace:
+
+```lua
+local traceId = DusaTraceClient.start(action, initialData)
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `action` | string | Operation type |
+| `initialData` | table? | Initial context |
+
+**Returns:** `traceId` string or `nil`
+
+### DusaTraceClient.addStep
+
+Add a step to a client trace:
+
+```lua
+DusaTraceClient.addStep(traceId, stage, data)
+```
+
+### DusaTraceClient.end_
+
+End a client trace:
+
+```lua
+DusaTraceClient.end_(traceId, status, finalData)
+```
+
+**Status values:** `'SUCCESS'` or `'ERROR'`
+
+## Trace Propagation
+
+### Attaching Trace ID to Server Calls
+
+```lua
+local traceId = DusaTraceClient.start('SEND_MESSAGE')
+
+-- Method 1: Manual attachment
+local result = lib.callback.await('tablet:sendMessage', false, {
+    _traceId = traceId,  -- Server extracts this
+    message = data.message
+})
+
+-- Method 2: Using helper
+local dataWithTrace = DusaTraceClient.attachTraceId(traceId, data)
+local result = lib.callback.await('tablet:sendMessage', false, dataWithTrace)
+
+DusaTraceClient.end_(traceId, result.success and 'SUCCESS' or 'ERROR')
+```
+
+### Server-Side Extraction
+
+```lua
+lib.callback.register('tablet:sendMessage', function(source, data)
+    -- Extract trace ID
+    local traceId = data._traceId
+
+    -- Continue server trace
+    if traceId then
+        DusaTrace.addStep(traceId, 'SERVER_RECEIVED', 'SERVER')
+    end
+
+    -- ... process message ...
+end)
+```
+
+## NUI Callback Wrapper
+
+Automatically trace NUI callbacks:
+
+```lua
+DusaTraceClient.wrapNuiCallback(callbackName, action, handler)
+```
+
+**Example:**
+
+```lua
+-- Instead of:
+RegisterNUICallback('sendMessage', function(data, cb)
+    -- ... handle ...
+end)
+
+-- Use:
+DusaTraceClient.wrapNuiCallback('sendMessage', 'SEND_MESSAGE', function(data, cb)
+    -- Trace automatically started
+    -- data._traceId automatically attached
+
+    local result = lib.callback.await('tablet:sendMessage', false, data)
+
+    -- Trace automatically ended based on result.success
+    cb(result)
+end)
+```
+
+## Query API
+
+### DusaTraceClient.getTraceData
+
+Get trace data for server propagation:
+
+```lua
+local traceData = DusaTraceClient.getTraceData(traceId)
+-- Returns: { traceId, action, clientSteps, clientStartTime }
+```
+
+### DusaTraceClient.getActiveCount
+
+Get number of active client traces:
+
+```lua
+local count = DusaTraceClient.getActiveCount()
+```
+
+## Complete Example
+
+```lua
+-- Client-side: User clicks "Send Message" in NUI
+
+RegisterNUICallback('sendMessage', function(data, cb)
+    -- Start client trace
+    local traceId = DusaTraceClient.start('SEND_MESSAGE', {
+        recipient = data.recipient
+    })
+
+    -- Track NUI step
+    DusaTraceClient.addStep(traceId, 'NUI_SEND_CLICKED', {
+        messageLength = #data.message
+    })
+
+    -- Make server call with trace ID
+    DusaTraceClient.addStep(traceId, 'SERVER_CALL_START')
+    local result = lib.callback.await('tablet:sendMessage', false, {
+        _traceId = traceId,
+        recipient = data.recipient,
+        message = data.message
+    })
+    DusaTraceClient.addStep(traceId, 'SERVER_CALL_DONE', {
+        success = result.success
+    })
+
+    -- End trace
+    if result.success then
+        DusaTraceClient.end_(traceId, 'SUCCESS', { messageId = result.messageId })
+    else
+        DusaTraceClient.end_(traceId, 'ERROR', { error = result.error })
+    end
+
+    cb(result)
+end)
+```
+
+## Trace Flow Visualization
+
+```
+NUI (React)
+    │
+    │ postNui('sendMessage')
+    │
+    ▼
+Client (Lua)
+    │ ← DusaTraceClient.start('SEND_MESSAGE')
+    │ ← DusaTraceClient.addStep('NUI_SEND_CLICKED')
+    │
+    │ lib.callback.await with _traceId
+    │
+    ▼
+Server (Lua)
+    │ ← DusaTrace.addStep('SERVER_RECEIVED')
+    │ ← DusaTrace.addStep('VALIDATION')
+    │
+    │ MySQL.query
+    │
+    ▼
+Database
+    │ ← DusaTrace.addStep('DATABASE_INSERT')
+    │
+    ▼
+Server (Response)
+    │ ← DusaTrace.end_('SUCCESS')
+    │
+    ▼
+Client (Response)
+    │ ← DusaTraceClient.end_('SUCCESS')
+    │
+    ▼
+NUI (Callback)
+```
+
+## Dashboard NUI Bridge
+
+`telemetry/client/dashboard_nui.lua` manages the telemetry dashboard UI.
+
+### Opening Dashboard
+
+```lua
+-- Command: /telemetry
+-- Keybind: F10 (default)
+
+-- Opens NUI dashboard
+-- Connects to server for real-time updates
+```
+
+### NUI Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `dusatrace:close` | Close dashboard |
+| `dusatrace:refresh` | Refresh live traces |
+| `dusatrace:getTraceDetails` | Get specific trace |
+| `dusatrace:getHistorical` | Get historical traces |
+| `dusatrace:getAnalytics` | Get analytics data |
+| `dusatrace:getStatus` | Get system status |
+
+### Real-Time Events
+
+```lua
+-- Server → Client events
+RegisterNetEvent('dusatrace:dashboard:stepAdded', function(traceId, step)
+    -- Update NUI with new step
+end)
+
+RegisterNetEvent('dusatrace:dashboard:traceCompleted', function(trace)
+    -- Update NUI with completed trace
+end)
+```

@@ -1,0 +1,228 @@
+---
+title: "Quickstart"
+description: "Get dusa_tablet running on your FiveM server"
+---
+
+# Quickstart Guide
+
+Get dusa_tablet up and running in minutes.
+
+## Prerequisites
+
+Before installing, ensure you have:
+
+- FiveM server (build 7290+)
+- OneSync enabled
+- [ox_lib](https://github.com/overextended/ox_lib)
+- [dusa_bridge](https://github.com/Dusa-DD/dusa_bridge)
+- [oxmysql](https://github.com/overextended/oxmysql)
+
+## Installation
+
+<Steps>
+
+<Step title="Download the Resource">
+Download the latest release from GitHub or your purchase platform.
+
+```bash
+# Place in your resources folder
+resources/
+└── [ecosystem]/
+    └── dusa_tablet/
+```
+</Step>
+
+<Step title="Configure server.cfg">
+Add to your `server.cfg`:
+
+```cfg
+ensure ox_lib
+ensure oxmysql
+ensure dusa_bridge
+ensure dusa_tablet
+```
+
+<Warning>
+Ensure `dusa_bridge` starts before `dusa_tablet` and after your framework.
+</Warning>
+</Step>
+
+<Step title="Configure Settings">
+Edit `config/config.lua` to customize:
+
+```lua
+Config.General = {
+    Debug = false,
+    Locale = 'en',  -- 'en', 'tr', etc.
+}
+
+Config.Tablet = {
+    OpenMethod = 'keybind',  -- 'keybind', 'command', 'item'
+    Keybind = {
+        Key = 'TAB',
+        Description = 'Open Tablet'
+    },
+    AllowInVehicle = false,
+    AllowWhileDead = false,
+}
+```
+</Step>
+
+<Step title="Import Database">
+The database schema is automatically imported on first start if `Config.Database.AutoMigration = true`.
+
+Or manually import:
+
+```bash
+mysql -u root -p your_database < sql/schema.sql
+```
+</Step>
+
+<Step title="Start and Test">
+Start your server and press `TAB` (or your configured key) to open the tablet.
+
+```
+# Console output on success:
+[dusa_tablet] Server initialized
+[dusa_tablet] Database migrations complete
+[dusa_tablet] Tablet ready
+```
+</Step>
+
+</Steps>
+
+## Open Methods
+
+<Tabs>
+  <Tab title="Keybind (Default)">
+    Players press a key to open the tablet.
+
+    ```lua
+    Config.Tablet.OpenMethod = 'keybind'
+    Config.Tablet.Keybind = {
+        Key = 'TAB',
+        Description = 'Open Tablet'
+    }
+    ```
+
+    Players can rebind in FiveM Settings → Key Bindings.
+  </Tab>
+
+  <Tab title="Command">
+    Players type a command to open.
+
+    ```lua
+    Config.Tablet.OpenMethod = 'command'
+    Config.Tablet.Command = {
+        Name = 'tablet'  -- /tablet
+    }
+    ```
+  </Tab>
+
+  <Tab title="Item">
+    Players use an inventory item to open.
+
+    ```lua
+    Config.Tablet.OpenMethod = 'item'
+    Config.Tablet.Item = {
+        Name = 'tablet',
+        Remove = false  -- Keep item after use
+    }
+    ```
+
+    Add the item to your inventory system:
+
+    ```lua
+    -- ox_inventory/data/items.lua
+    ['tablet'] = {
+        label = 'Tablet',
+        weight = 500,
+        stack = false,
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Verify Installation
+
+<AccordionGroup>
+  <Accordion title="Check Resource State">
+    In server console:
+    ```
+    refresh
+    ensure dusa_tablet
+    ```
+
+    Should see:
+    ```
+    [dusa_tablet] Server initialized
+    ```
+  </Accordion>
+
+  <Accordion title="Check Database">
+    Verify tables were created:
+    ```sql
+    SHOW TABLES LIKE 'tablet_%';
+    ```
+
+    Expected tables:
+    - `tablet_migrations`
+    - `tablet_mail_users`
+    - `tablet_mail_threads`
+    - `tablet_news_channels`
+    - etc.
+  </Accordion>
+
+  <Accordion title="Test In-Game">
+    1. Join your server
+    2. Press TAB (or configured key)
+    3. Tablet UI should appear
+    4. Test basic apps (Calculator, Settings)
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Tablet doesn't open">
+    - Check key binding conflicts
+    - Verify `Config.Tablet.AllowInVehicle` if in vehicle
+    - Check console for errors
+  </Accordion>
+
+  <Accordion title="Database errors">
+    - Ensure oxmysql is running
+    - Check database credentials in server.cfg
+    - Run migrations manually if needed
+  </Accordion>
+
+  <Accordion title="Missing dependencies">
+    ```
+    Error: Required resource 'dusa_bridge' is not running
+    ```
+
+    Ensure all dependencies are installed and started before dusa_tablet.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+
+<Card title="Configuration" icon="gear" href="/modules/shared/config">
+  Customize all tablet settings.
+</Card>
+
+<Card title="Custom Apps" icon="puzzle-piece" href="/api-reference/introduction">
+  Register your own apps.
+</Card>
+
+<Card title="Telemetry" icon="chart-line" href="/modules/telemetry/overview">
+  Enable operation tracing.
+</Card>
+
+<Card title="Localization" icon="globe" href="/modules/shared/config#localization">
+  Add or modify translations.
+</Card>
+
+</CardGroup>
