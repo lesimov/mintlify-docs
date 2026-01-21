@@ -1,0 +1,161 @@
+---
+title: "Codebase Map"
+description: "Complete file map with escrow status, global tables, callbacks, and exports for DUSA Tablet"
+---
+
+## Escrow Status
+
+| Status | Meaning | AI Action |
+|--------|---------|-----------|
+| `OPEN` | Can be modified | Propose code changes |
+| `LOCKED` | Cannot be modified | Report to user, suggest workaround |
+
+## File Map
+
+### Configuration (OPEN)
+
+```
+config/config.lua [OPEN]
+├── Config.General        - Locale, debug
+├── Config.Telemetry      - Sentry DSN, rate limits
+├── Config.Tablet         - Open method, keybinds, animation
+├── Config.CustomApps     - Custom app limits
+├── Config.Apps           - Built-in app toggles
+├── Config.Database       - Migration settings
+├── Config.Dev            - Dev mode, restart key
+├── Config.ErrorCapture   - Error capture whitelist
+├── Config.ImageUpload    - Camera upload (Discord/Fivemanage/Fivemerr)
+├── Config.News           - News channels with job mappings
+├── Config.Messages       - Phone sync settings
+└── Config.MapsPOI        - Points of interest
+```
+
+### Shared Modules
+
+```
+shared/
+├── constants.lua         [LOCKED] TabletConstants
+├── debug_bridge.lua      [LOCKED] TabletDebugBridge
+└── locales/              [OPEN]
+    ├── init.lua          [OPEN] Locale loader
+    ├── en.lua            [OPEN] English
+    └── tr.lua            [OPEN] Turkish
+```
+
+### Server Modules
+
+```
+server/
+├── main.lua              [LOCKED] TabletServer
+├── debug/                [LOCKED] ServerLogger, ServerTelemetry
+├── database/             [LOCKED] TabletMigration, TabletDatabase
+└── apps/
+    ├── mail.lua          [LOCKED] Email system
+    ├── news.lua          [LOCKED] News system
+    ├── camera.lua        [LOCKED] Screenshot upload
+    └── messages/
+        ├── init.lua      [LOCKED]
+        └── adapters/     [OPEN] Phone adapters
+            ├── baseAdapter.lua       [OPEN]
+            ├── lbPhoneAdapter.lua    [OPEN]
+            ├── qbPhoneAdapter.lua    [OPEN]
+            ├── qsSmartphoneAdapter.lua [OPEN]
+            ├── roadphoneAdapter.lua  [OPEN]
+            └── gksphoneAdapter.lua   [OPEN]
+```
+
+### Client Modules
+
+```
+client/
+├── main.lua              [LOCKED] TabletClient
+└── debug/logger.lua      [LOCKED] TabletLogger
+```
+
+### Telemetry
+
+```
+telemetry/
+├── config.lua            [OPEN] DusaTraceConfig
+├── shared/constants.lua  [LOCKED]
+├── server/               [LOCKED] DusaTrace engine
+└── client/               [LOCKED] DusaTraceClient
+```
+
+## Global Tables
+
+### Core (LOCKED)
+
+| Table | Side | Purpose |
+|-------|------|---------|
+| `TabletConstants` | Shared | Constants and enums |
+| `TabletDebugBridge` | Shared | Cross-resource logging |
+| `ServerLogger` | Server | Server-side logging |
+| `TabletServer` | Server | App registration, callbacks |
+| `TabletMigration` | Server | Database migrations |
+| `TabletDatabase` | Server | Database operations |
+| `TabletClient` | Client | Tablet UI control |
+| `TabletLogger` | Client | Client-side logging |
+
+### Configurable (OPEN)
+
+| Table | File |
+|-------|------|
+| `Config` | config/config.lua |
+| `DusaTraceConfig` | telemetry/config.lua |
+| `TabletLocale` | shared/locales/init.lua |
+| `PhoneAdapter` | server/apps/messages/adapters/baseAdapter.lua |
+
+## Callbacks (lib.callback)
+
+| Callback | File | Purpose |
+|----------|------|---------|
+| `dusa_tablet:getServerApps` | server/main.lua | Get registered apps |
+| `dusa_tablet:checkPermission` | server/main.lua | Check app permission |
+| `tablet:getUserInfo` | server/main.lua | Get player name |
+| `tablet:maps:getPOI` | server/main.lua | Get POI data |
+| `tablet:mail:*` | server/apps/mail.lua | Email operations |
+| `tablet:news:*` | server/apps/news.lua | News operations |
+| `tablet:camera:getConfig` | server/apps/camera.lua | Camera config |
+| `tablet:messages:*` | server/apps/messages/ | Message sync |
+
+## Exports
+
+### Server
+
+```lua
+exports['dusa_tablet']:RegisterApp(appData)
+exports['dusa_tablet']:UnregisterApp(appId)
+exports['dusa_tablet']:GetRegisteredApps()
+exports['dusa_tablet']:getDebugBridge()
+exports['dusa_tablet']:runMigration(migrationName)
+```
+
+### Client
+
+```lua
+exports['dusa_tablet']:Open()
+exports['dusa_tablet']:Close()
+exports['dusa_tablet']:Toggle()
+exports['dusa_tablet']:IsOpen()
+exports['dusa_tablet']:HideTablet()
+exports['dusa_tablet']:ShowTablet()
+exports['dusa_tablet']:GetTabletState()
+exports['dusa_tablet']:RegisterApp(appData)
+exports['dusa_tablet']:UnregisterApp(appId)
+exports['dusa_tablet']:ShowNotification(app, title, desc, time)
+exports['dusa_tablet']:GetCurrentLocale()
+```
+
+## OPEN Files Summary
+
+Files AI can modify:
+
+```
+config/config.lua
+shared/locales/*.lua
+server/apps/messages/adapters/*.lua
+telemetry/config.lua
+```
+
+All other `.lua` files are **LOCKED**.

@@ -1,0 +1,191 @@
+---
+title: "Database Schema"
+description: "Complete database schema reference for DUSA Tablet including mail, news, telemetry tables and phone adapter queries"
+---
+
+## Tablet Core Tables
+
+### tablet_migrations
+
+```sql
+CREATE TABLE tablet_migrations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    migration VARCHAR(255) NOT NULL UNIQUE,
+    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## Mail System
+
+### tablet_mail_users
+
+```sql
+CREATE TABLE tablet_mail_users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    identifier VARCHAR(64) NOT NULL,      -- citizenid/identifier
+    email VARCHAR(100) NOT NULL UNIQUE,   -- john.doe@tablet.mail
+    display_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_identifier (identifier)
+);
+```
+
+### tablet_mail_threads
+
+```sql
+CREATE TABLE tablet_mail_threads (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subject VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### tablet_mail_thread_participants
+
+```sql
+CREATE TABLE tablet_mail_thread_participants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    thread_id INT NOT NULL,
+    user_id INT NOT NULL,
+    is_read TINYINT(1) DEFAULT 0,
+    archived TINYINT(1) DEFAULT 0,
+    FOREIGN KEY (thread_id) REFERENCES tablet_mail_threads(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES tablet_mail_users(id) ON DELETE CASCADE,
+    UNIQUE KEY (thread_id, user_id)
+);
+```
+
+### tablet_mail_messages
+
+```sql
+CREATE TABLE tablet_mail_messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    thread_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (thread_id) REFERENCES tablet_mail_threads(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES tablet_mail_users(id) ON DELETE CASCADE
+);
+```
+
+## News System
+
+### tablet_news_channels
+
+```sql
+CREATE TABLE tablet_news_channels (
+    id VARCHAR(50) PRIMARY KEY,           -- 'lspd', 'weazel'
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon VARCHAR(50),                     -- SF Symbol
+    color VARCHAR(7),                     -- #RRGGBB
+    job VARCHAR(50),                      -- Job that can write
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### tablet_news_articles
+
+```sql
+CREATE TABLE tablet_news_articles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    channel_id VARCHAR(50) NOT NULL,
+    author_identifier VARCHAR(64) NOT NULL,
+    author_name VARCHAR(100),
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    media JSON,
+    published TINYINT(1) DEFAULT 1,
+    views INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (channel_id) REFERENCES tablet_news_channels(id) ON DELETE CASCADE
+);
+```
+
+## Telemetry Tables
+
+### dusatrace_traces
+
+```sql
+CREATE TABLE dusatrace_traces (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    trace_id VARCHAR(50) NOT NULL UNIQUE,
+    action VARCHAR(100) NOT NULL,
+    player_id INT,
+    player_identifier VARCHAR(64),
+    final_status ENUM('SUCCESS', 'ERROR', 'TIMEOUT') NOT NULL,
+    duration_ms INT,
+    step_count INT,
+    steps JSON,
+    initial_data JSON,
+    final_data JSON,
+    resource VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## Phone Adapter Queries
+
+### lb-phone
+
+```sql
+-- Get phone number
+SELECT phone_number FROM phone_phones WHERE owner = ?
+
+-- Get conversations
+SELECT mc.id, mc.participants,
+    (SELECT content FROM phone_messages WHERE channel_id = mc.id ORDER BY timestamp DESC LIMIT 1) as last_message
+FROM phone_message_channels mc
+WHERE JSON_CONTAINS(mc.participants, ?)
+
+-- Get messages
+SELECT * FROM phone_messages WHERE channel_id = ? ORDER BY timestamp ASC
+```
+
+### qs-smartphone
+
+```sql
+-- Get phone number
+SELECT phone_number FROM smartphone_users WHERE identifier = ?
+
+-- Get conversations
+SELECT DISTINCT
+    CASE WHEN sender = ? THEN receiver ELSE sender END as other_number
+FROM smartphone_messages WHERE sender = ? OR receiver = ?
+
+-- Get messages
+SELECT * FROM smartphone_messages
+WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?)
+ORDER BY timestamp ASC
+```
+
+## Data Format for NUI
+
+### Conversation Object
+
+```lua
+{
+    id = "conv_123",
+    phone_number = "555-1234",
+    display_name = "John Doe",
+    last_message = "Hey there",
+    last_message_time = 1705320000,
+    unread_count = 3,
+    is_muted = false,
+}
+```
+
+### Message Object
+
+```lua
+{
+    id = "msg_456",
+    content = "Hello!",
+    timestamp = 1705320000,
+    is_sender = true,
+    is_read = true,
+}
+```

@@ -101,6 +101,16 @@
             "pages": [
               "scripts/dusa_tablet/api-reference/introduction"
             ]
+          },
+          {
+            "group": "AI Reference",
+            "pages": [
+              "scripts/dusa_tablet/ai-internal/index",
+              "scripts/dusa_tablet/ai-internal/codebase-map",
+              "scripts/dusa_tablet/ai-internal/database-schema",
+              "scripts/dusa_tablet/ai-internal/issue-resolution",
+              "scripts/dusa_tablet/ai-internal/app-development"
+            ]
           }
         ]
       },

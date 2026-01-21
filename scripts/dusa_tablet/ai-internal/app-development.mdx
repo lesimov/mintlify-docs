@@ -1,0 +1,194 @@
+---
+title: "App Development"
+description: "Guide for creating external iframe apps and integrating with DUSA Tablet"
+---
+
+## App Types
+
+| Type | Status | Use Case |
+|------|--------|----------|
+| External iframe | Recommended | Third-party apps |
+| Config POI | OPEN | Maps locations |
+| Built-in | LOCKED | Core tablet apps |
+
+## External App Registration
+
+### Server-Side
+
+```lua
+CreateThread(function()
+    while GetResourceState('dusa_tablet') ~= 'started' do
+        Wait(500)
+    end
+    Wait(1000)
+
+    exports['dusa_tablet']:RegisterApp({
+        id = 'myapp',
+        name = 'My Application',
+        icon = 'myapp.svg',
+        description = 'App description',
+        ui = {
+            type = 'iframe',
+            url = 'https://cfx-nui-your_resource/dist/index.html',
+        },
+        permissions = {
+            job = 'police',  -- or {'police', 'sheriff'}
+        },
+    })
+end)
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if resourceName == GetCurrentResourceName() then
+        exports['dusa_tablet']:UnregisterApp('myapp')
+    end
+end)
+```
+
+### Client-Side with Callbacks
+
+```lua
+exports['dusa_tablet']:RegisterApp({
+    id = 'myapp',
+    name = 'My Application',
+    icon = 'myapp.svg',
+    ui = {
+        type = 'iframe',
+        url = 'https://cfx-nui-your_resource/dist/index.html',
+    },
+    onOpen = function()
+        print('App opened')
+    end,
+    onClose = function()
+        print('App closed')
+    end,
+})
+```
+
+## App Data Structure
+
+```lua
+---@field id string Required - Unique identifier
+---@field name string Required - Display name
+---@field icon string Required - Icon filename
+---@field description? string Optional - Tooltip
+---@field ui AppUI Required for iframe
+---@field permissions? AppPermissions Optional
+
+---@class AppUI
+---@field type 'iframe'
+---@field url string Full NUI URL
+
+---@class AppPermissions
+---@field job? string|string[]
+---@field gang? string|string[]
+```
+
+## iframe Communication
+
+### Tablet to App
+
+```typescript
+window.addEventListener('message', (event) => {
+    const { action, data } = event.data;
+
+    switch (action) {
+        case 'TABLET_APP_OPENED':
+            // Initialize
+            break;
+        case 'TABLET_LANGUAGE_CHANGE':
+            i18n.changeLanguage(data.locale);
+            break;
+    }
+});
+```
+
+### App to Tablet
+
+```typescript
+// Close tablet
+window.parent.postMessage({ action: 'CLOSE_TABLET' }, '*');
+
+// Show notification
+window.parent.postMessage({
+    action: 'SHOW_NOTIFICATION',
+    data: {
+        app: 'My App',
+        title: 'Success',
+        description: 'Done',
+    },
+}, '*');
+```
+
+## NUI Callback from iframe
+
+```typescript
+export async function fetchNui<T>(eventName: string, data?: any): Promise<T> {
+    const resourceName = (window as any).GetParentResourceName?.() || 'your_resource';
+    const response = await fetch(`https://${resourceName}/${eventName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data || {}),
+    });
+    return response.json();
+}
+```
+
+## Permission Examples
+
+```lua
+-- Single job
+permissions = { job = 'police' }
+
+-- Multiple jobs
+permissions = { job = {'police', 'sheriff', 'fib'} }
+
+-- Gang
+permissions = { gang = 'ballas' }
+
+-- No restrictions
+permissions = {}
+```
+
+## Maps POI (Config-Based)
+
+Add to `config/config.lua` [OPEN]:
+
+```lua
+Config.MapsPOI = {
+    {
+        id = 'mechanic-shop-1',
+        name = 'Benny\'s Custom Shop',
+        category = 'garage',  -- hospital, police, gas_station, garage, store, bank, restaurant
+        coords = { x = -211.55, y = -1320.56, z = 30.89 },
+        address = 'Strawberry, Los Santos',
+        phone = '555-BENNY',
+        hours = '09:00 - 21:00',
+    },
+}
+```
+
+## Troubleshooting
+
+### App Not Appearing
+
+1. Is `dusa_tablet` started?
+2. Does player have required job/gang?
+3. Check console for errors
+4. Add delay after tablet starts
+
+### iframe Not Loading
+
+1. Check NUI URL
+2. Check CORS
+3. Check `web/dist/index.html` exists
+4. Check files in `fxmanifest.lua`
+
+### Debug
+
+```lua
+local success = exports['dusa_tablet']:RegisterApp(...)
+print('Registration:', success)
+
+local apps = exports['dusa_tablet']:GetRegisteredApps()
+print('Apps:', json.encode(apps))
+```

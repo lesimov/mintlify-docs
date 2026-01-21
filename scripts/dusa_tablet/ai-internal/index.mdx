@@ -1,0 +1,73 @@
+---
+title: "AI Reference"
+description: "Internal documentation for AI assistants to understand and troubleshoot DUSA Tablet"
+---
+
+## Quick Reference
+
+### OPEN Files (Can Modify)
+
+```
+config/config.lua
+shared/locales/*.lua
+server/apps/messages/adapters/*.lua
+telemetry/config.lua
+```
+
+### LOCKED Files (Cannot Modify)
+
+All other `.lua` files - report to user with workaround.
+
+## Documentation Index
+
+| Document | Content |
+|----------|---------|
+| [Codebase Map](/scripts/dusa_tablet/ai-internal/codebase-map) | File structure, escrow status, exports, callbacks |
+| [Database Schema](/scripts/dusa_tablet/ai-internal/database-schema) | Table schemas, adapter queries |
+| [Issue Resolution](/scripts/dusa_tablet/ai-internal/issue-resolution) | Problem diagnosis, solutions by category |
+| [App Development](/scripts/dusa_tablet/ai-internal/app-development) | External app creation, iframe integration |
+
+## AI Protocol
+
+1. **Identify issue** - Find file in Codebase Map
+2. **Check escrow** - OPEN = fix directly, LOCKED = report
+3. **Apply solution** - Use templates from Issue Resolution
+4. **LOCKED file** - Inform user, suggest workaround
+
+## Response Templates
+
+### OPEN File Fix
+
+```markdown
+## Solution
+
+**File**: `config/config.lua`
+
+Change:
+\`\`\`lua
+Config.Tablet.OpenMethod = 'command'
+\`\`\`
+```
+
+### LOCKED File Report
+
+```markdown
+## Issue Detected
+
+**File**: `server/main.lua`
+**Status**: LOCKED (Escrowed)
+
+Cannot modify. Contact developer.
+
+**Workaround**: {if available}
+```
+
+## Common Fixes
+
+| Issue | File | Solution |
+|-------|------|----------|
+| Tablet won't open | config/config.lua | Check OpenMethod, keybind |
+| Wrong language | shared/locales/*.lua | Add/fix translation |
+| Phone sync broken | config/config.lua | Enable Messages, check adapter |
+| Camera upload fails | config/config.lua | Check ImageUpload webhook |
+| Discord alerts off | telemetry/config.lua | Set webhook URL |

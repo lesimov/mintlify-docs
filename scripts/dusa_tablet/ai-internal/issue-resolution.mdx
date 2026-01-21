@@ -1,0 +1,178 @@
+---
+title: "Issue Resolution"
+description: "Structured guide for diagnosing and resolving DUSA Tablet issues with escrow-aware solutions"
+---
+
+## Issue Categories
+
+| Category | Files | Status |
+|----------|-------|--------|
+| CONFIG | `config/config.lua` | **OPEN** |
+| TRANSLATION | `shared/locales/*.lua` | **OPEN** |
+| ADAPTER | `server/apps/messages/adapters/*.lua` | **OPEN** |
+| TELEMETRY | `telemetry/config.lua` | **OPEN** |
+| CORE | Other server/client/shared files | **LOCKED** |
+| NUI | web/, dist/ | **LOCKED** |
+
+## Config Issues (OPEN)
+
+### Tablet Won't Open
+
+Check `Config.Tablet`:
+
+```lua
+Config.Tablet = {
+    OpenMethod = 'keybind',  -- 'keybind', 'command', 'item'
+    Keybind = { Key = 'TAB' },
+    AllowInVehicle = true,
+    AllowWhileDead = false,
+}
+```
+
+### Animation Issues
+
+```lua
+Config.Tablet.Animation = {
+    Enabled = true,
+    Dict = 'amb@code_human_in_bus_passenger_idles@female@tablet@base',
+    Anim = 'base',
+    Prop = 'prop_cs_tablet',
+    Bone = 28422,
+    Offset = { x = 0.03, y = 0.002, z = -0.0 },
+    Rotation = { x = 10.0, y = 160.0, z = 0.0 },
+}
+```
+
+### Camera Upload Fails
+
+```lua
+Config.ImageUpload = {
+    Provider = 'discord',  -- 'discord', 'fivemanage', 'fivemerr'
+    Discord = {
+        Webhook = 'https://discord.com/api/webhooks/YOUR_WEBHOOK',
+    },
+}
+```
+
+### News Channel Missing
+
+```lua
+Config.News.Channels = {
+    {
+        id = 'custom_channel',
+        name = 'Custom News',
+        icon = '???',
+        color = '#3B82F6',
+        job = 'reporter',
+    },
+}
+```
+
+### Phone Sync Not Working
+
+```lua
+Config.Messages = {
+    Enabled = true,
+    WriteEnabled = true,
+    AutoDetect = true,
+    ForceAdapter = nil,  -- 'lb', 'qb', 'qs', 'road', 'gks'
+}
+```
+
+## Translation Issues (OPEN)
+
+Location: `shared/locales/en.lua` or `shared/locales/tr.lua`
+
+Add missing key:
+
+```lua
+return {
+    settings = {
+        general = {
+            title = 'General Settings',
+        },
+    },
+}
+```
+
+## Adapter Issues (OPEN)
+
+Location: `server/apps/messages/adapters/`
+
+New adapter template:
+
+```lua
+NewPhoneAdapter = setmetatable({}, { __index = PhoneAdapter })
+NewPhoneAdapter.__index = NewPhoneAdapter
+
+function NewPhoneAdapter:new()
+    local instance = PhoneAdapter:new('newphone')
+    setmetatable(instance, self)
+    return instance
+end
+
+function NewPhoneAdapter:GetPlayerPhoneNumber(identifier)
+    local result = self:SafeSingle([[
+        SELECT phone_number FROM newphone_users WHERE identifier = ?
+    ]], { identifier })
+    return result and result.phone_number or nil
+end
+
+function NewPhoneAdapter:GetConversations(phoneNumber)
+    -- Implement based on phone's database
+end
+
+function NewPhoneAdapter:GetMessages(phoneNumber, conversationId)
+    -- Implement based on phone's database
+end
+```
+
+## Telemetry Issues (OPEN)
+
+Location: `telemetry/config.lua`
+
+### Discord Alerts
+
+```lua
+DusaTraceConfig.Alerts = {
+    Enabled = true,
+    DiscordWebhook = 'https://discord.com/api/webhooks/VALID_WEBHOOK',
+}
+```
+
+### Reduce Alert Spam
+
+```lua
+DusaTraceConfig.Thresholds = {
+    ErrorRateThreshold = 0.15,
+    SlowOperationMs = 2000,
+    ErrorSpikeCount = 10,
+}
+```
+
+## LOCKED File Response Template
+
+When issue is in a LOCKED file:
+
+```
+## Issue Detected
+
+**File**: `{file_path}`
+**Status**: LOCKED (Escrowed)
+
+This file is protected by FiveM escrow and cannot be modified.
+
+### Workaround
+{workaround if available}
+
+### Permanent Fix
+Contact developer.
+```
+
+## Common LOCKED Workarounds
+
+| Issue | Locked File | Workaround |
+|-------|-------------|------------|
+| Callback wrong data | server/apps/*.lua | Check config filtering |
+| Export not working | main.lua | Verify calling correctly |
+| Animation broken | client/main.lua | Adjust Config.Tablet.Animation |
