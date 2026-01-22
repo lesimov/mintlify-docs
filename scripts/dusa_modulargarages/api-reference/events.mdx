@@ -1,0 +1,383 @@
+---
+title: "Events"
+description: "Server and client events for real-time communication."
+---
+
+# Events
+
+Events provide real-time communication between server and client.
+
+## Client Events (Server → Client)
+
+### Garage UI
+
+#### dusa-garage:client:openGarage
+
+Open the garage UI with data.
+
+```lua
+RegisterNetEvent('dusa-garage:client:openGarage', function(garage, vehicles, garageConfig)
+    -- garage: Garage object
+    -- vehicles: Array of vehicle objects
+    -- garageConfig: UI configuration
+end)
+```
+
+---
+
+#### dusa-garage:client:updateGarageData
+
+Update garage data without reopening UI.
+
+```lua
+RegisterNetEvent('dusa-garage:client:updateGarageData', function(vehicles)
+    -- vehicles: Updated vehicle array
+end)
+```
+
+---
+
+#### dusa-garage:client:receiveGarageLocations
+
+Receive all garage locations for zone setup.
+
+```lua
+RegisterNetEvent('dusa-garage:client:receiveGarageLocations', function(garageLocations)
+    -- garageLocations: Array of garage location data
+end)
+```
+
+---
+
+#### dusa-garage:client:refreshGarageZones
+
+Trigger zone refresh (after garage creation/deletion).
+
+```lua
+RegisterNetEvent('dusa-garage:client:refreshGarageZones', function()
+    -- Refresh ox_target zones
+end)
+```
+
+### Vehicle Operations
+
+#### dusa-garage:client:vehicleStored
+
+Vehicle successfully stored.
+
+```lua
+RegisterNetEvent('dusa-garage:client:vehicleStored', function(plate)
+    -- plate: Stored vehicle plate
+end)
+```
+
+---
+
+#### dusa-garage:client:vehicleSpawned
+
+Vehicle successfully spawned.
+
+```lua
+RegisterNetEvent('dusa-garage:client:vehicleSpawned', function(plate, netId)
+    -- plate: Spawned vehicle plate
+    -- netId: Network ID of spawned vehicle
+end)
+```
+
+---
+
+#### dusa-garage:client:exitVehicle
+
+Force player to exit vehicle.
+
+```lua
+RegisterNetEvent('dusa-garage:client:exitVehicle', function()
+    -- Used before vehicle operations
+end)
+```
+
+---
+
+#### garage:client:startVehicleEngine
+
+Start vehicle engine automatically.
+
+```lua
+RegisterNetEvent('garage:client:startVehicleEngine', function(netId)
+    -- netId: Network ID of vehicle
+end)
+```
+
+---
+
+#### garage:client:setVehicleHealth
+
+Apply health props to vehicle.
+
+```lua
+RegisterNetEvent('garage:client:setVehicleHealth', function(networkId, healthProps)
+    -- networkId: Vehicle network ID
+    -- healthProps: Health data object
+end)
+```
+
+---
+
+#### garage:client:enableGhostMode
+
+Enable ghost mode (no collision).
+
+```lua
+RegisterNetEvent('garage:client:enableGhostMode', function(networkId, duration)
+    -- networkId: Vehicle network ID
+    -- duration: Ghost duration in ms
+end)
+```
+
+### Transfer
+
+#### dusa-garage:client:transferResult
+
+Transfer operation result.
+
+```lua
+RegisterNetEvent('dusa-garage:client:transferResult', function(data)
+    -- data.success: boolean
+    -- data.fee: number (if charged)
+    -- data.message: string
+end)
+```
+
+### Job Vehicles
+
+#### dusa-garage:client:receiveJobVehicles
+
+Receive available job vehicles.
+
+```lua
+RegisterNetEvent('dusa-garage:client:receiveJobVehicles', function(data)
+    -- data.vehicles: Available vehicle array
+    -- data.jobName: Current job
+end)
+```
+
+---
+
+#### dusa-garage:client:jobVehicleSpawned
+
+Job vehicle spawned successfully.
+
+```lua
+RegisterNetEvent('dusa-garage:client:jobVehicleSpawned', function(data)
+    -- data.netId: Network ID
+    -- data.model: Vehicle model
+end)
+```
+
+---
+
+#### dusa-garage:client:jobVehicleReturned
+
+Job vehicle returned.
+
+```lua
+RegisterNetEvent('dusa-garage:client:jobVehicleReturned', function(data)
+    -- data.success: boolean
+    -- data.message: string
+end)
+```
+
+### Impound
+
+#### dusa-garage:client:openImpoundMenu
+
+Open impound menu for vehicle.
+
+```lua
+RegisterNetEvent('dusa-garage:client:openImpoundMenu', function(vehicleData, isPolice)
+    -- vehicleData: Vehicle information
+    -- isPolice: Has impound permissions
+end)
+```
+
+### Repair
+
+#### dusa-garage:client:openRepairView
+
+Open 3D repair view.
+
+```lua
+RegisterNetEvent('dusa-garage:client:openRepairView', function(plate, vehicleData)
+    -- plate: Vehicle plate
+    -- vehicleData: Full vehicle data with props
+end)
+```
+
+---
+
+#### dusa-garage:client:closeRepairView
+
+Close repair view.
+
+```lua
+RegisterNetEvent('dusa-garage:client:closeRepairView', function()
+    -- Cleanup repair showroom
+end)
+```
+
+### Valet
+
+#### dusa-garage:client:startValetDelivery
+
+Start valet NPC delivery.
+
+```lua
+RegisterNetEvent('dusa-garage:client:startValetDelivery', function(vehicleNetId, npcModel, config)
+    -- vehicleNetId: Vehicle network ID
+    -- npcModel: NPC ped model
+    -- config: Valet configuration
+end)
+```
+
+### Admin/Editor
+
+#### dusa-garage:client:openAdminEditor
+
+Open admin editor UI.
+
+```lua
+RegisterNetEvent('dusa-garage:client:openAdminEditor', function()
+    -- Opens garage management interface
+end)
+```
+
+---
+
+#### dusa-garage:client:garageCreated
+
+Garage creation result.
+
+```lua
+RegisterNetEvent('dusa-garage:client:garageCreated', function(result)
+    -- result.success: boolean
+    -- result.garageId: number
+    -- result.message: string
+end)
+```
+
+### Notifications
+
+#### dusa-garage:client:notify
+
+Show notification.
+
+```lua
+RegisterNetEvent('dusa-garage:client:notify', function(message, type)
+    -- message: Notification text
+    -- type: "success", "error", "info", "warning"
+end)
+```
+
+---
+
+#### dusa-garage:client:permissionDenied
+
+Permission denied notification.
+
+```lua
+RegisterNetEvent('dusa-garage:client:permissionDenied', function(message)
+    -- message: Reason for denial
+end)
+```
+
+## Server Events (Client → Server)
+
+### Garage Operations
+
+#### dusa-garage:server:requestGarageLocations
+
+Request all garage locations.
+
+```lua
+TriggerServerEvent('dusa-garage:server:requestGarageLocations')
+```
+
+---
+
+#### dusa-garage:server:getGarageData
+
+Request garage data.
+
+```lua
+TriggerServerEvent('dusa-garage:server:getGarageData', garageId)
+```
+
+### Job Vehicles
+
+#### dusa-garage:server:getJobVehicles
+
+Get job vehicles for player.
+
+```lua
+TriggerServerEvent('dusa-garage:server:getJobVehicles', { garageId = garageId })
+```
+
+---
+
+#### dusa-garage:server:spawnJobVehicle
+
+Spawn job vehicle.
+
+```lua
+TriggerServerEvent('dusa-garage:server:spawnJobVehicle', vehicleModel, spawnCoords, spawnHeading)
+```
+
+---
+
+#### dusa-garage:server:returnJobVehicleDriveIn
+
+Return job vehicle.
+
+```lua
+TriggerServerEvent('dusa-garage:server:returnJobVehicleDriveIn', netId, plate, garageId, garageData)
+```
+
+### Valet
+
+#### dusa-garage:server:valetDeliveryComplete
+
+Notify valet delivery complete.
+
+```lua
+TriggerServerEvent('dusa-garage:server:valetDeliveryComplete', netId, plate)
+```
+
+---
+
+#### dusa-garage:server:valetFallbackDirect
+
+Request fallback to direct spawn.
+
+```lua
+TriggerServerEvent('dusa-garage:server:valetFallbackDirect', netId, plate)
+```
+
+### Showroom
+
+#### garage:server:setShowroomBucket
+
+Set player routing bucket for showroom.
+
+```lua
+TriggerServerEvent('garage:server:setShowroomBucket', playerId)
+```
+
+---
+
+#### garage:server:resetShowroomBucket
+
+Reset player routing bucket.
+
+```lua
+TriggerServerEvent('garage:server:resetShowroomBucket', playerId)
+```

@@ -1,0 +1,372 @@
+---
+title: "Troubleshooting"
+description: "Common errors, debug commands, and diagnostic steps for AI-assisted debugging."
+---
+
+# Troubleshooting Guide
+
+Common issues, debug commands, and diagnostic steps.
+
+## Debug System
+
+### Enable Debug Mode
+
+```lua
+-- config/shared.lua
+Config.Debug = {
+    Enabled = true,
+    MinLevel = "DEBUG",  -- ERROR, WARN, INFO, DEBUG
+}
+```
+
+### Enable Specific Topics
+
+```lua
+Config.Debug.Topics = {
+    ["vehicle-operations"] = { enabled = true },
+    ["database"] = { enabled = true },
+    ["api"] = { enabled = true },
+    ["validation"] = { enabled = true },
+    -- Add more as needed
+}
+```
+
+### Debug Log Format
+
+```
+[DUSA-GARAGE] [LEVEL] [TOPIC] Message { data }
+```
+
+Example:
+```
+[DUSA-GARAGE] [DEBUG] [vehicle-operations] Storing vehicle { plate = "ABC123", garageId = 5 }
+```
+
+## Debug Commands
+
+### Server Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/garage debug status` | Show system status |
+| `/garage debug topics` | List all debug topics |
+| `/garage debug enable [topic]` | Enable debug topic |
+| `/garage debug disable [topic]` | Disable debug topic |
+| `/garage debug database` | Show database status |
+| `/garage debug garages` | List all garages |
+| `/garage debug zones` | Show active zones |
+
+### Client Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/garage help` | Show all commands |
+| `/garage teleport [name]` | Teleport to garage |
+| `/garage editor` | Open admin editor |
+| `/garage test` | Open test menu |
+| `/garage zones` | Show zone markers |
+
+## Common Errors
+
+### Database Errors
+
+#### "Table doesn't exist"
+
+**Symptom:** `MySQL error: Table 'dusa_garages' doesn't exist`
+
+**Cause:** Database schema not installed
+
+**Solution:**
+```sql
+-- Run consolidated schema
+SOURCE sql/release/consolidated_schema.sql;
+
+-- Or enable auto-migration
+-- config/server.lua
+Config.Server.Database.AutoMigrate = true
+Config.Server.Database.AutoCheckDatabase = true
+```
+
+---
+
+#### "Foreign key constraint fails"
+
+**Symptom:** `Cannot add or update a child row: a]foreign key constraint fails`
+
+**Cause:** Referenced record doesn't exist (usually garage_id)
+
+**Solution:**
+```sql
+-- Check if garage exists
+SELECT * FROM dusa_garages WHERE id = [garageId];
+
+-- If missing, either create garage or fix foreign key
+```
+
+---
+
+#### "Duplicate entry"
+
+**Symptom:** `Duplicate entry 'ABC123' for key 'PRIMARY'`
+
+**Cause:** Vehicle already exists in metadata/persistent tables
+
+**Solution:**
+```sql
+-- Use INSERT ... ON DUPLICATE KEY UPDATE
+INSERT INTO dusa_vehicle_metadata (plate, mileage)
+VALUES ('ABC123', 0)
+ON DUPLICATE KEY UPDATE updated_at = NOW();
+```
+
+### Vehicle Operations
+
+#### "Vehicle not spawning"
+
+**Diagnostic Steps:**
+1. Check if vehicle is impounded:
+   ```sql
+   SELECT * FROM dusa_vehicle_impounds 
+   WHERE plate = 'ABC123' AND is_released = 0;
+   ```
+
+2. Check if vehicle is locked by mechanic:
+   ```lua
+   exports['dusa_modulargarages']:IsVehicleLockedByMechanic('ABC123')
+   ```
+
+3. Check spawn points:
+   ```sql
+   SELECT locations FROM dusa_garages WHERE id = [garageId];
+   ```
+
+4. Enable debug:
+   ```lua
+   Config.Debug.Topics["vehicle-operations"].enabled = true
+   ```
+
+---
+
+#### "Vehicle stored but not showing in list"
+
+**Diagnostic Steps:**
+1. Check vehicle's garage assignment:
+   ```sql
+   -- QBCore
+   SELECT garage FROM player_vehicles WHERE plate = 'ABC123';
+   
+   -- ESX
+   SELECT garage FROM owned_vehicles WHERE plate = 'ABC123';
+   ```
+
+2. Verify garage type matches player access:
+   ```lua
+   -- Check garage type
+   SELECT type, owner_identifier FROM dusa_garages WHERE id = [garageId];
+   ```
+
+3. Check garage sharing access:
+   ```sql
+   SELECT * FROM dusa_garage_access 
+   WHERE garage_id = [garageId] AND user_identifier = '[playerIdentifier]';
+   ```
+
+---
+
+#### "Cannot store vehicle - not owner"
+
+**Cause:** Ownership validation failing
+
+**Solution:**
+1. Check vehicle ownership in framework table
+2. Verify `Config.Server.Security.ValidateVehicleOwnership`
+3. Check if vehicle is shared:
+   ```sql
+   SELECT * FROM dusa_vehicle_sharing 
+   WHERE owner_identifier = '[ownerIdentifier]' 
+     AND shared_with_identifier = '[currentPlayer]';
+   ```
+
+### UI Errors
+
+#### "Garage UI not opening"
+
+**Diagnostic Steps:**
+1. Check if NUI is built:
+   ```bash
+   ls web/build/
+   # Should contain index.html
+   ```
+
+2. Rebuild if needed:
+   ```bash
+   cd web && npm run build
+   ```
+
+3. Check browser console (F8 in-game):
+   ```
+   [NUI] Error: Cannot read property 'x' of undefined
+   ```
+
+4. Enable UI debug:
+   ```lua
+   Config.Debug.Topics["ui-interactions"].enabled = true
+   ```
+
+---
+
+#### "NUI callback not responding"
+
+**Diagnostic Steps:**
+1. Check callback is registered:
+   ```lua
+   -- Search for callback name in client files
+   RegisterNUICallback('callbackName', ...)
+   ```
+
+2. Check server callback exists:
+   ```lua
+   -- Search in server/api/sv_api.lua
+   lib.callback.register('dusa-garage:server:...')
+   ```
+
+3. Check for Lua errors in console
+
+### Zone/Interaction Errors
+
+#### "Cannot interact with garage"
+
+**Diagnostic Steps:**
+1. Check if zones are loaded:
+   ```lua
+   /garage zones
+   ```
+
+2. Verify garage locations in database:
+   ```sql
+   SELECT id, name, JSON_EXTRACT(locations, '$.interaction') 
+   FROM dusa_garages;
+   ```
+
+3. Check ox_target is working:
+   ```lua
+   -- Test with simple target
+   exports.ox_target:addGlobalVehicle({...})
+   ```
+
+4. Refresh zones:
+   ```lua
+   TriggerServerEvent('dusa-garage:server:requestGarageLocations')
+   ```
+
+---
+
+#### "Blips not showing"
+
+**Check Configuration:**
+```lua
+-- config/client.lua
+Config.Client.Effects.ShowBlips = true
+Config.Client.Effects.BlipVisibility.Enabled = true
+Config.Client.Effects.BlipVisibility.ShowPublicGarages = true
+```
+
+### Transfer Errors
+
+#### "Transfer failed - insufficient funds"
+
+**Diagnostic:**
+1. Check account balance:
+   ```lua
+   local player = Framework.GetPlayer(source)
+   print(player.GetMoney('bank'))
+   ```
+
+2. Check transfer pricing:
+   ```lua
+   -- config/shared.lua
+   Config.Prices.vehicleTransfer.feeType  -- "flat" or "distance"
+   Config.Prices.vehicleTransfer.flatFee   -- 350
+   Config.Prices.vehicleTransfer.accountType -- "bank" or "cash"
+   ```
+
+---
+
+#### "Transfer failed - vehicle spawned"
+
+**Cause:** Vehicle currently in world
+
+**Solution:**
+1. Check `Config.Prices.vehicleTransfer.allowTransferIfSpawned`
+2. If true, waypoint should be set instead
+3. Store vehicle first, then transfer
+
+### Impound Errors
+
+#### "Cannot impound - no permission"
+
+**Check:**
+1. Player job is in allowed list:
+   ```lua
+   -- config/shared.lua
+   Config.Impound.AllowedJobs = {"police", "sheriff", "tow", ...}
+   ```
+
+2. Check callback:
+   ```lua
+   lib.callback.await('dusa-garage:server:checkImpoundPermission')
+   ```
+
+---
+
+#### "Cannot release - fee required"
+
+**Diagnostic:**
+```sql
+SELECT release_fee, impound_type 
+FROM dusa_vehicle_impounds 
+WHERE plate = 'ABC123' AND is_released = 0;
+```
+
+## Error Code Reference
+
+| Code | Message | Solution |
+|------|---------|----------|
+| `NOT_OWNER` | "You don't own this vehicle" | Check ownership validation |
+| `VEHICLE_SPAWNED` | "Vehicle is currently out" | Store vehicle first |
+| `INVALID_GARAGE` | "Garage not found" | Check garage exists |
+| `NO_PERMISSION` | "Access denied" | Check permissions/job/access |
+| `VEHICLE_IMPOUNDED` | "Vehicle is impounded" | Release from impound first |
+| `INSUFFICIENT_FUNDS` | "Not enough money" | Check balance and account type |
+| `RATE_LIMITED` | "Too many requests" | Wait for cooldown |
+| `MECHANIC_LOCKED` | "Vehicle in mechanic workshop" | Wait for work order completion |
+
+## Log File Locations
+
+| Log Type | Location |
+|----------|----------|
+| Server console | `txData/[profile]/logs/` |
+| Client console | F8 in-game |
+| MySQL errors | MySQL error log |
+| FiveM errors | `citizen/` folder |
+
+## Health Check Script
+
+```lua
+-- Run in server console
+RegisterCommand('garage_healthcheck', function()
+    -- Check database
+    local garageCount = MySQL.scalar.await('SELECT COUNT(*) FROM dusa_garages')
+    print(('Garages: %d'):format(garageCount or 0))
+    
+    -- Check config
+    print(('Debug: %s'):format(Config.Debug.Enabled and 'enabled' or 'disabled'))
+    print(('Impound: %s'):format(Config.Impound.Enabled and 'enabled' or 'disabled'))
+    print(('Transfer: %s'):format(Config.Prices.vehicleTransfer.enabled and 'enabled' or 'disabled'))
+    
+    -- Check modules
+    print(('Mileage: %s'):format(MileageConfig and MileageConfig.enabled and 'enabled' or 'disabled'))
+    print(('Persistent: %s'):format(PersistentParkingConfig and PersistentParkingConfig.enabled and 'enabled' or 'disabled'))
+    print(('Sharing: %s'):format(GarageSharingConfig and GarageSharingConfig.enabled and 'enabled' or 'disabled'))
+end, true)
+```

@@ -1,0 +1,364 @@
+---
+title: "Exports"
+description: "External resource integration via exports."
+---
+
+# Exports
+
+Exports allow other resources to integrate with Dusa Modular Garages.
+
+## Server Exports
+
+### Vehicle Queries
+
+#### IsVehicleInGarage
+
+Check if vehicle is stored in any garage.
+
+```lua
+local isInGarage = exports['dusa_modulargarages']:IsVehicleInGarage(plate)
+-- Returns: boolean
+```
+
+---
+
+#### GetVehicleGarage
+
+Get the garage a vehicle is stored in.
+
+```lua
+local garageId = exports['dusa_modulargarages']:GetVehicleGarage(plate)
+-- Returns: number|nil
+```
+
+---
+
+#### GetVehicleByPlate
+
+Get full vehicle data by plate.
+
+```lua
+local vehicleData = exports['dusa_modulargarages']:GetVehicleByPlate(plate)
+-- Returns: table|nil
+-- {
+--     plate = "ABC123",
+--     model = "adder",
+--     garage = 5,
+--     owner = "identifier",
+--     mileage = 1500.5,
+--     customName = "My Adder",
+--     healthProps = {...}
+-- }
+```
+
+### Garage Queries
+
+#### GetGarageById
+
+Get garage information by ID.
+
+```lua
+local garage = exports['dusa_modulargarages']:GetGarageById(garageId)
+-- Returns: table|nil
+```
+
+---
+
+#### GetGarageByName
+
+Get garage by unique name.
+
+```lua
+local garage = exports['dusa_modulargarages']:GetGarageByName("legion_public")
+-- Returns: table|nil
+```
+
+---
+
+#### GetPlayerGarages
+
+Get all garages a player has access to.
+
+```lua
+local garages = exports['dusa_modulargarages']:GetPlayerGarages(source)
+-- Returns: table[]
+```
+
+### Impound
+
+#### IsVehicleImpounded
+
+Check if vehicle is impounded.
+
+```lua
+local isImpounded = exports['dusa_modulargarages']:IsVehicleImpounded(plate)
+-- Returns: boolean
+```
+
+---
+
+#### GetImpoundInfo
+
+Get impound details.
+
+```lua
+local impoundInfo = exports['dusa_modulargarages']:GetImpoundInfo(plate)
+-- Returns: table|nil
+-- {
+--     id = 1,
+--     impoundType = "temporary",
+--     reason = "Illegal parking",
+--     releaseAt = timestamp,
+--     releaseFee = 500
+-- }
+```
+
+---
+
+#### ImpoundVehicle
+
+Impound a vehicle programmatically.
+
+```lua
+local success = exports['dusa_modulargarages']:ImpoundVehicle(plate, {
+    reason = "Stolen vehicle",
+    type = "permanent", -- "temporary", "permanent", "paid"
+    duration = 24,      -- hours (for temporary)
+    fee = 5000,         -- (for paid)
+    impoundedBy = identifier
+})
+-- Returns: boolean
+```
+
+---
+
+#### ReleaseFromImpound
+
+Release vehicle from impound.
+
+```lua
+local success = exports['dusa_modulargarages']:ReleaseFromImpound(plate, releasedBy)
+-- Returns: boolean
+```
+
+### Mechanic Integration
+
+#### LockVehicleForMechanic
+
+Lock vehicle for mechanic work order.
+
+```lua
+local success = exports['dusa_modulargarages']:LockVehicleForMechanic(plate, orderId)
+-- Returns: boolean
+```
+
+---
+
+#### UnlockVehicleFromMechanic
+
+Unlock vehicle after mechanic work.
+
+```lua
+local success = exports['dusa_modulargarages']:UnlockVehicleFromMechanic(plate, orderId)
+-- Returns: boolean
+```
+
+---
+
+#### IsVehicleLockedByMechanic
+
+Check if vehicle is locked by mechanic.
+
+```lua
+local isLocked = exports['dusa_modulargarages']:IsVehicleLockedByMechanic(plate)
+-- Returns: boolean
+```
+
+### Vehicle Metadata
+
+#### GetVehicleMileage
+
+Get vehicle mileage.
+
+```lua
+local mileage = exports['dusa_modulargarages']:GetVehicleMileage(plate)
+-- Returns: number (km)
+```
+
+---
+
+#### SetVehicleMileage
+
+Set vehicle mileage.
+
+```lua
+exports['dusa_modulargarages']:SetVehicleMileage(plate, mileage)
+```
+
+---
+
+#### GetVehicleHealthProps
+
+Get vehicle health properties.
+
+```lua
+local healthProps = exports['dusa_modulargarages']:GetVehicleHealthProps(plate)
+-- Returns: table
+-- {
+--     engineHealth = 1000,
+--     bodyHealth = 1000,
+--     fuelLevel = 100,
+--     ...
+-- }
+```
+
+### Vehicle Photos
+
+#### GetVehicleImage
+
+Get cached vehicle image URL.
+
+```lua
+local imageUrl = exports['dusa_modulargarages']:GetVehicleImage(modelName)
+-- Returns: string|nil
+```
+
+---
+
+#### RegisterVehiclePhoto
+
+Register a new vehicle photo.
+
+```lua
+exports['dusa_modulargarages']:RegisterVehiclePhoto(modelName, imageUrl, checksum)
+```
+
+## Client Exports
+
+### UI Control
+
+#### OpenGarage
+
+Open garage UI programmatically.
+
+```lua
+exports['dusa_modulargarages']:OpenGarage(garageId)
+```
+
+---
+
+#### CloseGarage
+
+Close garage UI.
+
+```lua
+exports['dusa_modulargarages']:CloseGarage()
+```
+
+---
+
+#### IsGarageOpen
+
+Check if garage UI is open.
+
+```lua
+local isOpen = exports['dusa_modulargarages']:IsGarageOpen()
+-- Returns: boolean
+```
+
+### Vehicle Operations
+
+#### IsNearGarage
+
+Check if player is near any garage.
+
+```lua
+local nearGarage = exports['dusa_modulargarages']:IsNearGarage()
+-- Returns: garageData|nil
+```
+
+---
+
+#### GetCurrentGarage
+
+Get current garage player is interacting with.
+
+```lua
+local garage = exports['dusa_modulargarages']:GetCurrentGarage()
+-- Returns: table|nil
+```
+
+### Repair
+
+#### OpenRepairView
+
+Open repair view for vehicle.
+
+```lua
+exports['dusa_modulargarages']:OpenRepairView(plate)
+```
+
+---
+
+#### CloseRepairView
+
+Close repair view.
+
+```lua
+exports['dusa_modulargarages']:CloseRepairView()
+```
+
+## Integration Examples
+
+### Custom Dealership Integration
+
+```lua
+-- When selling a vehicle
+RegisterServerEvent('dealership:vehicleSold')
+AddEventHandler('dealership:vehicleSold', function(plate, buyerSource)
+    -- Check if vehicle was in a garage
+    local wasInGarage = exports['dusa_modulargarages']:IsVehicleInGarage(plate)
+    
+    if wasInGarage then
+        -- Vehicle is stored, update ownership in your database
+        -- The garage system will reflect new ownership automatically
+    end
+end)
+```
+
+### Custom Impound Integration
+
+```lua
+-- Police script impound command
+RegisterCommand('policeimpound', function(source, args)
+    local plate = args[1]
+    local reason = table.concat(args, ' ', 2)
+    
+    local success = exports['dusa_modulargarages']:ImpoundVehicle(plate, {
+        reason = reason,
+        type = "paid",
+        fee = 5000,
+        impoundedBy = GetPlayerIdentifier(source)
+    })
+    
+    if success then
+        TriggerClientEvent('notify', source, 'Vehicle impounded')
+    end
+end, true)
+```
+
+### Mechanic Work Order Lock
+
+```lua
+-- When mechanic accepts work order
+RegisterServerEvent('mechanic:orderAccepted')
+AddEventHandler('mechanic:orderAccepted', function(orderId, plate)
+    exports['dusa_modulargarages']:LockVehicleForMechanic(plate, orderId)
+end)
+
+-- When work order is completed
+RegisterServerEvent('mechanic:orderCompleted')
+AddEventHandler('mechanic:orderCompleted', function(orderId, plate)
+    exports['dusa_modulargarages']:UnlockVehicleFromMechanic(plate, orderId)
+end)
+```

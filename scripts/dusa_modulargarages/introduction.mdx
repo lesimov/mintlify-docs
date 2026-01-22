@@ -1,0 +1,92 @@
+---
+title: "Dusa Modular Garages"
+description: "A comprehensive, framework-agnostic garage management system for FiveM with modern UI, persistent parking, vehicle transfers, impound system, and tablet integration."
+---
+
+# Introduction
+
+**Dusa Modular Garages** is a feature-rich garage management system designed for FiveM servers. Built with a modular architecture, it supports multiple frameworks through `dusa_bridge` and provides extensive customization options.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Garage Types" icon="warehouse">
+    Support for public, property, and job garages with unique access controls
+  </Card>
+  <Card title="Vehicle Transfers" icon="truck-arrow-right">
+    Transfer vehicles between garages with configurable flat or distance-based fees
+  </Card>
+  <Card title="Persistent Parking" icon="car-side">
+    Vehicles persist in the world with hourly parking fees
+  </Card>
+  <Card title="Impound System" icon="gavel">
+    Full impound management with temporary, permanent, and paid release options
+  </Card>
+  <Card title="Repair & Refuel" icon="wrench">
+    3D vehicle inspection with part-based repairs and fuel management
+  </Card>
+  <Card title="Mileage Tracking" icon="road">
+    Real-time odometer display with configurable units (km/miles)
+  </Card>
+  <Card title="Garage Sharing" icon="users">
+    Share garage access with other players with permission controls
+  </Card>
+  <Card title="Valet Service" icon="person-walking">
+    NPC-driven or direct vehicle delivery to player location
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        dusa_modulargarages                       │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   Client    │  │   Server    │  │         Web UI          │  │
+│  │  (Lua)      │◄─►│  (Lua)      │◄─►│  (Svelte + TypeScript)  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│         │                │                      │                │
+│         ▼                ▼                      ▼                │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                      dusa_bridge                             ││
+│  │           (Framework-agnostic abstraction layer)             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│         │                │                                       │
+│         ▼                ▼                                       │
+│  ┌─────────────┐  ┌─────────────┐                               │
+│  │   QBCore    │  │     ESX     │   (or any supported framework)│
+│  └─────────────┘  └─────────────┘                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Dependencies
+
+| Resource | Version | Required | Purpose |
+|----------|---------|----------|---------|
+| `dusa_bridge` | Latest | ✅ Yes | Framework abstraction layer |
+| `oxmysql` | 2.0+ | ✅ Yes | Database operations |
+| `ox_lib` | Latest | ✅ Yes | Callbacks, locale, utilities |
+| `screenshot-basic` | Latest | ✅ Yes | Vehicle photo capture |
+
+## Optional Integrations
+
+| Integration | Purpose |
+|-------------|---------|
+| `dusa_tablet` | Tablet app interface |
+| `dusa_mechanicv2` | Mechanic work order locking |
+| `ox_fuel` / `LegacyFuel` | Fuel management |
+
+## Quick Links
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up the resource
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure all options
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Server & client APIs
+  </Card>
+</CardGroup>

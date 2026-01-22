@@ -1,0 +1,174 @@
+---
+title: "Server Configuration"
+description: "Server-side configuration settings in config/server.lua for database, security, and performance."
+---
+
+# Server Configuration
+
+The `config/server.lua` file contains server-specific settings.
+
+## Database Settings
+
+```lua
+Config.Server.Database = {
+    AutoMigrate = true,          -- Run migrations on startup
+    AutoCheckDatabase = true,    -- Check schema on startup
+    BackupOnStart = false,       -- Create backup on start
+    CleanupInterval = 3600000,   -- Cleanup expired meets (1 hour)
+}
+```
+
+### Auto Migration
+
+When `AutoMigrate = true`, the system automatically:
+1. Checks for missing tables
+2. Applies pending migrations from `sql/migrations/`
+3. Records applied migrations in `dusa_migrations` table
+
+### Schema Check
+
+When `AutoCheckDatabase = true`, the system verifies:
+- All required tables exist
+- Required columns are present
+- Indexes are created
+
+## Performance Settings
+
+```lua
+Config.Server.Performance = {
+    MaxConcurrentQueries = 10,    -- Max parallel DB queries
+    QueryTimeout = 5000,          -- Query timeout (ms)
+    CacheVehicleData = true,      -- Cache vehicle metadata
+    CacheExpiry = 300000,         -- Cache TTL (5 minutes)
+}
+```
+
+### Caching
+
+Vehicle data caching reduces database load:
+
+```lua
+-- Cache stores:
+-- - Vehicle properties
+-- - Ownership data
+-- - Metadata (mileage, health)
+```
+
+## Car Meets (Future Feature)
+
+```lua
+Config.Server.CarMeets = {
+    MaxActiveMeets = 10,          -- Max concurrent meets
+    DefaultDuration = 7200,       -- 2 hours
+    MaxDuration = 28800,          -- 8 hours
+    CleanupExpired = true,        -- Auto cleanup
+}
+```
+
+## Security Settings
+
+```lua
+Config.Server.Security = {
+    ValidateVehicleOwnership = true,  -- Check ownership
+    LogTransactions = true,           -- Log all transactions
+    
+    RateLimiting = {
+        Enabled = true,
+        MaxRequests = 10,             -- Per player
+        Interval = 60000,             -- Per minute
+    }
+}
+```
+
+### Ownership Validation
+
+When enabled, the server validates:
+- Player owns the vehicle before operations
+- Player has access to the garage
+- Vehicle is not locked by mechanic
+- Vehicle is not impounded
+
+### Rate Limiting
+
+Prevents abuse of server callbacks:
+
+| Callback Type | Max Requests | Window |
+|---------------|--------------|--------|
+| All callbacks | 10 | 60 seconds |
+
+<Warning>
+Disabling rate limiting in production is not recommended as it exposes your server to potential abuse.
+</Warning>
+
+## Webhook Integration
+
+```lua
+Config.Server.Webhooks = {
+    Enabled = false,
+    VehicleTransfer = "",        -- Discord webhook URL
+    CarMeetCreated = "",         -- Discord webhook URL
+    SecurityAlert = "",          -- Discord webhook URL
+}
+```
+
+### Webhook Events
+
+| Event | Trigger | Data Sent |
+|-------|---------|-----------|
+| `VehicleTransfer` | Vehicle moved between garages | plate, from, to, player |
+| `CarMeetCreated` | New car meet created | location, host, duration |
+| `SecurityAlert` | Suspicious activity detected | type, player, details |
+
+### Example Webhook Payload
+
+```json
+{
+    "embeds": [{
+        "title": "Vehicle Transfer",
+        "color": 3066993,
+        "fields": [
+            {"name": "Plate", "value": "ABC123", "inline": true},
+            {"name": "From", "value": "Legion Garage", "inline": true},
+            {"name": "To", "value": "Alta Garage", "inline": true},
+            {"name": "Player", "value": "John Doe", "inline": false},
+            {"name": "Fee", "value": "$350", "inline": true}
+        ],
+        "timestamp": "2024-01-15T12:00:00.000Z"
+    }]
+}
+```
+
+## Recommended Production Settings
+
+```lua
+Config.Server = {
+    Database = {
+        AutoMigrate = true,
+        AutoCheckDatabase = true,
+        BackupOnStart = true,      -- Enable backups
+        CleanupInterval = 3600000,
+    },
+    
+    Performance = {
+        MaxConcurrentQueries = 10,
+        QueryTimeout = 5000,
+        CacheVehicleData = true,
+        CacheExpiry = 300000,
+    },
+    
+    Security = {
+        ValidateVehicleOwnership = true,
+        LogTransactions = true,
+        RateLimiting = {
+            Enabled = true,         -- Keep enabled!
+            MaxRequests = 10,
+            Interval = 60000,
+        }
+    },
+    
+    Webhooks = {
+        Enabled = true,
+        SecurityAlert = "https://discord.com/api/webhooks/...",
+    }
+}
+```

@@ -1,0 +1,157 @@
+---
+title: "Configuration Overview"
+description: "Understand the configuration structure and how to customize Dusa Modular Garages."
+---
+
+# Configuration Overview
+
+Dusa Modular Garages uses a modular configuration system split across multiple files for easy management.
+
+## Configuration Files
+
+| File | Scope | Purpose |
+|------|-------|---------|
+| `config/shared.lua` | Both | Core settings, pricing, debug, locale |
+| `config/server.lua` | Server | Database, security, performance |
+| `config/client.lua` | Client | UI, effects, controls |
+| `config/job_vehicles.lua` | Both | Job vehicle definitions |
+| `config/modules/*.lua` | Both | Module-specific settings |
+
+## Configuration Hierarchy
+
+```
+Config (global table)
+├── Locale                 # Language setting
+├── Debug                  # Debug system
+│   ├── Enabled
+│   ├── MinLevel
+│   └── Topics{}
+├── DefaultSettings        # Garage defaults
+├── Prices                 # Pricing configuration
+│   ├── vehicleTransfer
+│   ├── repair
+│   ├── fuel
+│   └── valet
+├── RepairShowroom         # 3D repair settings
+├── VehicleTracking        # Metadata tracking
+├── JobVehicleValidation   # Validation rules
+├── JobVehicleLimits       # Job vehicle limits
+├── UI                     # UI settings
+├── Distance               # Interaction distances
+├── Keys                   # Keybinds
+├── RealEstate             # Real estate integration
+├── MechanicIntegration    # Mechanic script lock
+├── Impound                # Impound system
+├── Server (server.lua)
+│   ├── Database
+│   ├── Performance
+│   ├── CarMeets
+│   ├── Security
+│   └── Webhooks
+├── Client (client.lua)
+│   ├── UI
+│   ├── Vehicle
+│   ├── Effects
+│   ├── Performance
+│   └── Controls
+└── JobVehicles{}          # Job vehicle definitions
+```
+
+## Feature Toggles
+
+Most features can be enabled/disabled via configuration:
+
+```lua
+-- Pricing & Services
+Config.Prices.vehicleTransfer.enabled = true
+Config.Prices.repair.enabled = true
+Config.Prices.fuel.enabled = true
+Config.Prices.valet.enabled = true
+
+-- Systems
+Config.VehicleTracking.Enabled = true
+Config.MechanicIntegration.Enabled = true
+Config.Impound.Enabled = true
+Config.RealEstate.Enabled = true
+
+-- Modules (in respective module configs)
+MileageConfig.enabled = true
+PersistentParkingConfig.enabled = true
+GarageSharingConfig.enabled = true
+```
+
+## Hot Reload
+
+Some configurations support hot reload without server restart:
+
+```lua
+-- Job vehicles hot reload
+Config.JobVehicleHotReload = {
+    Enabled = true,
+    ValidateOnReload = true,
+    AdminOnly = true,
+    NotifyPlayers = true,
+}
+```
+
+## Debug System
+
+The debug system uses topic-based filtering:
+
+```lua
+Config.Debug = {
+    Enabled = false,
+    MinLevel = "ERROR",  -- ERROR, WARN, INFO, DEBUG
+    Topics = {
+        ["vehicle-operations"] = { enabled = true, color = "^4" },
+        ["database"] = { enabled = false, color = "^2" },
+        ["repair-system"] = { enabled = false, color = "^5" },
+        -- ... more topics
+    }
+}
+```
+
+### Available Debug Topics
+
+| Topic | Description |
+|-------|-------------|
+| `garage-creation` | New garage creation and management |
+| `vehicle-operations` | Vehicle parking, spawning, and storage |
+| `bridge-integration` | Framework and bridge interactions |
+| `database` | Database queries and operations |
+| `ui-interactions` | NUI callbacks and UI events |
+| `zone-management` | Garage zones and interaction areas |
+| `api` | Server API endpoints and callbacks |
+| `validation` | Input validation and security checks |
+| `job-vehicles` | Job vehicles and their management |
+| `mileage-tracking` | Mileage tracking system |
+| `vehicle-transfer` | Vehicle transfer operations |
+| `repair-system` | Repair and refuel operations |
+| `garage-sharing` | Garage access sharing system |
+| `impound` | Impound operations |
+
+## Environment-Specific Settings
+
+<Tabs>
+  <Tab title="Development">
+    ```lua
+    -- config/shared.lua
+    Config.Debug.Enabled = true
+    Config.Debug.MinLevel = "DEBUG"
+    
+    -- config/server.lua
+    Config.Server.Security.RateLimiting.Enabled = false
+    ```
+  </Tab>
+  <Tab title="Production">
+    ```lua
+    -- config/shared.lua
+    Config.Debug.Enabled = false
+    Config.Debug.MinLevel = "ERROR"
+    
+    -- config/server.lua
+    Config.Server.Security.RateLimiting.Enabled = true
+    Config.Server.Security.ValidateVehicleOwnership = true
+    ```
+  </Tab>
+</Tabs>

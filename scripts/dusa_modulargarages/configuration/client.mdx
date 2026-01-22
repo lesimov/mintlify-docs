@@ -1,0 +1,206 @@
+---
+title: "Client Configuration"
+description: "Client-side configuration settings in config/client.lua for UI, effects, and controls."
+---
+
+# Client Configuration
+
+The `config/client.lua` file contains client-specific settings for UI, visual effects, and controls.
+
+## UI Settings
+
+```lua
+Config.Client.UI = {
+    EnableSounds = true,           -- UI sound effects
+    AnimationSpeed = 300,          -- Animation duration (ms)
+    ShowNotifications = true,      -- System notifications
+    NotificationDuration = 5000,   -- Notification display time (ms)
+}
+```
+
+## Vehicle Settings
+
+```lua
+Config.Client.Vehicle = {
+    PreviewEnabled = true,         -- Enable vehicle preview
+    PreviewDistance = 10.0,        -- Preview render distance
+    SpawnInVehicle = false,        -- Spawn player inside vehicle
+    DeleteOnFarDistance = 200.0,   -- Delete if player too far
+}
+```
+
+### Vehicle Preview
+
+When enabled, hovering over a vehicle in the UI shows a 3D preview with:
+- Vehicle model
+- Current damage state
+- Custom modifications
+
+## Visual Effects
+
+### Blips
+
+```lua
+Config.Client.Effects = {
+    ShowBlips = true,
+    BlipSprite = 357,              -- Garage icon
+    BlipColor = 3,                 -- Blue
+    BlipScale = 0.8,
+}
+```
+
+### Blip Visibility
+
+```lua
+Config.Client.Effects.BlipVisibility = {
+    Enabled = true,
+    ShowOnlyNearby = true,         -- Performance mode
+    NearbyRadius = 100.0,          -- Meters
+    UpdateInterval = 5000,         -- Check frequency (ms)
+    ShowJobGarages = true,         -- Show job garage blips
+    ShowPublicGarages = true,
+    ShowPropertyGarages = true,
+}
+```
+
+<Tip>
+Enable `ShowOnlyNearby` on large servers with many garages to improve performance.
+</Tip>
+
+### Blip Grouping
+
+```lua
+Config.Client.Effects.BlipGrouping = {
+    Mode = "individual",           -- "category" or "individual"
+    CategoryStyle = "grouped",     -- "grouped" or "all_separate"
+    
+    Categories = {
+        car = "Garages",
+        boat = "Boat Garages",
+        aircraft = "Aircraft Garages"
+    }
+}
+```
+
+| Mode | Display |
+|------|---------|
+| `individual` | Each garage shows its name |
+| `category` | Garages grouped by vehicle type |
+
+### Markers
+
+```lua
+Config.Client.Effects = {
+    ShowMarkers = true,
+    MarkerType = 36,
+    MarkerSize = {1.5, 1.5, 1.0},
+    MarkerColor = {0, 255, 0, 100},  -- RGBA
+}
+```
+
+## Performance Settings
+
+```lua
+Config.Client.Performance = {
+    UpdateInterval = 1000,         -- Distance check frequency (ms)
+    RenderDistance = 50.0,         -- Garage element render distance
+    MaxVisibleVehicles = 20,       -- Max vehicles in preview
+}
+```
+
+### Performance Recommendations
+
+| Setting | Low-End PC | Mid-Range | High-End |
+|---------|------------|-----------|----------|
+| UpdateInterval | 2000 | 1000 | 500 |
+| RenderDistance | 30.0 | 50.0 | 100.0 |
+| MaxVisibleVehicles | 10 | 20 | 50 |
+
+## Controls
+
+```lua
+Config.Client.Controls = {
+    DisableControlsInUI = {
+        1,    -- Look Left/Right
+        2,    -- Look Up/Down
+        142,  -- Attack
+        18,   -- Enter Vehicle
+        322,  -- ESC
+        106,  -- Vehicle Mouse Control Override
+    }
+}
+```
+
+### Control IDs
+
+These controls are disabled when the garage UI is open to prevent accidental inputs:
+
+| ID | Control Name | Purpose |
+|----|--------------|---------|
+| 1 | INPUT_LOOK_LR | Prevent camera movement |
+| 2 | INPUT_LOOK_UD | Prevent camera movement |
+| 142 | INPUT_MELEE_ATTACK_ALTERNATE | Prevent attacks |
+| 18 | INPUT_ENTER | Prevent vehicle entry |
+| 322 | INPUT_FRONTEND_CANCEL | Allow ESC for UI close |
+| 106 | INPUT_VEH_MOUSE_CONTROL_OVERRIDE | Prevent mouse vehicle control |
+
+## Full Example
+
+```lua
+Config.Client = {
+    UI = {
+        EnableSounds = true,
+        AnimationSpeed = 300,
+        ShowNotifications = true,
+        NotificationDuration = 5000,
+    },
+    
+    Vehicle = {
+        PreviewEnabled = true,
+        PreviewDistance = 10.0,
+        SpawnInVehicle = false,
+        DeleteOnFarDistance = 200.0,
+    },
+    
+    Effects = {
+        ShowBlips = true,
+        BlipSprite = 357,
+        BlipColor = 3,
+        BlipScale = 0.8,
+        ShowMarkers = true,
+        MarkerType = 36,
+        MarkerSize = {1.5, 1.5, 1.0},
+        MarkerColor = {0, 255, 0, 100},
+        
+        BlipVisibility = {
+            Enabled = true,
+            ShowOnlyNearby = true,
+            NearbyRadius = 100.0,
+            UpdateInterval = 5000,
+            ShowJobGarages = true,
+            ShowPublicGarages = true,
+            ShowPropertyGarages = true,
+        },
+        
+        BlipGrouping = {
+            Mode = "individual",
+            CategoryStyle = "grouped",
+            Categories = {
+                car = "Garages",
+                boat = "Boat Garages",
+                aircraft = "Aircraft Garages"
+            }
+        }
+    },
+    
+    Performance = {
+        UpdateInterval = 1000,
+        RenderDistance = 50.0,
+        MaxVisibleVehicles = 20,
+    },
+    
+    Controls = {
+        DisableControlsInUI = {1, 2, 142, 18, 322, 106}
+    }
+}
+```

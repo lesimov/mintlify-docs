@@ -1,0 +1,257 @@
+---
+title: "API Quick Reference"
+description: "Complete callback, event, and NUI callback reference in table format for AI lookup."
+---
+
+# API Quick Reference
+
+Comprehensive API reference in table format for AI semantic search.
+
+## Server Callbacks
+
+### Garage Operations
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:server:storeVehicle` | `plate: string, garageId: number` | `{success, message}` | sv_api.lua:1063 |
+| `dusa-garage:server:spawnVehicle` | `plate: string, garageId: number` | `{success, netId, message}` | sv_api.lua:1191 |
+| `dusa-garage:server:getGarageData` | `garageId: number, ownerIdentifier?: string` | `{garage, vehicles, config}` | sv_api.lua:1217 |
+| `dusa-garage:server:getVehiclesPage` | `{garageId, page, limit, ownerIdentifier?}` | `{vehicles[], total, page, totalPages}` | sv_api.lua:4176 |
+| `dusa-garage:server:transferVehicle` | `plate: string, fromGarageId: number, toGarageId: number` | `{success, fee, message}` | sv_api.lua:2820 |
+| `dusa-garage:server:updateVehicleName` | `plate: string, customName: string` | `{success, message}` | sv_api.lua:2877 |
+
+### Garage Management
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:server:createGarage` | `{name, type, locations, settings?}` | `{success, garageId, message}` | sv_api.lua:1543 |
+| `dusa-garage:server:editGarage` | `garageId: number, updateData: table` | `{success, message}` | sv_api.lua:1768 |
+| `dusa-garage:server:deleteGarage` | `garageId: number` | `{success, message}` | sv_api.lua:1714 |
+| `dusa-garage:server:getAllPublicGarages` | none | `garage[]` | sv_api.lua:1633 |
+| `dusa-garage:server:getPropertyGarages` | none | `garage[]` | sv_api.lua:1610 |
+| `dusa-garage:server:getJobGarages` | none | `garage[]` | sv_api.lua:2354 |
+| `dusa-garage:server:getAllGarages` | none | `garage[]` | sv_api.lua:1962 |
+| `dusa-garage:server:deleteJobGarage` | `garageId: number` | `{success, message}` | sv_api.lua:2428 |
+
+### Access Management
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:editor:getUserAccess` | `garageId: number` | `{users[]}` | sv_api.lua:1460 |
+| `dusa-garage:editor:addUserAccess` | `garageId: number, playerIdentifier: string` | `{success, message}` | sv_api.lua:1481 |
+| `dusa-garage:editor:removeUserAccess` | `garageId: number, playerIdentifier: string` | `{success, message}` | sv_api.lua:1518 |
+| `dusa-garage:server:checkRealEstateAccess` | none | `{hasAccess, permissions}` | sv_api.lua:1863 |
+| `dusa-garage:server:getAllGaragesForRealEstate` | none | `garage[]` | sv_api.lua:1909 |
+| `dusa-garage:server:getPlayerData` | `targetServerId: number` | `{name, identifier}` | sv_api.lua:1827 |
+
+### Impound System
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:server:checkImpoundPermission` | none | `boolean` | sv_api.lua:2952 |
+| `dusa-garage:server:impoundVehicle` | `plate, reason, impoundType, durationHours?, releaseFee?` | `{success, impoundId}` | sv_api.lua:2957 |
+| `dusa-garage:server:getImpoundedVehicles` | none | `impound[]` | sv_api.lua:3049 |
+| `dusa-garage:server:updateImpoundDuration` | `vehicleId: number, change: number` | `{success, message}` | sv_api.lua:3118 |
+| `dusa-garage:server:releaseImpound` | `vehicleId, isOwnerRelease, currentGarageName?` | `{success, message}` | sv_api.lua:3171 |
+| `dusa-garage:server:getImpoundIdByPlate` | `plate: string` | `number|nil` | sv_api.lua:3374 |
+| `dusa-garage:server:releaseImpoundByPlate` | `plate, isOwnerRelease, currentGarageName?` | `{success, message}` | sv_api.lua:3402 |
+| `dusa-garage:server:getVehicleOwner` | `plate: string` | `{name, identifier}` | sv_api.lua:3586 |
+| `dusa-garage:server:getGarageNameById` | `garageId: number` | `string|nil` | sv_api.lua:3388 |
+
+### Repair & Fuel
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:server:repairVehicle` | `plate: string` | `{success, cost, message}` | sv_repair.lua:221 |
+| `dusa-garage:server:refillFuel` | `plate: string, fuelResource: string` | `{success, cost, liters}` | sv_repair.lua:398 |
+| `dusa-garage:server:getVehicleDataForRepair` | `plate: string` | `vehicleData` | sv_repair.lua:559 |
+| `dusa-garage:server:spawnVehicleForRepair` | `plate, spawnCoords, vehicleData` | `{success, netId}` | sv_repair.lua:589 |
+| `dusa-garage:server:setRepairRoutingBucket` | `vehicleNetId, enable: boolean` | `{success}` | sv_repair.lua:728 |
+
+### Valet Service
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `dusa-garage:server:requestValet` | `plate, garageId, playerCoords` | `{success, message}` | core/valet.lua:476 |
+| `dusa-garage:server:getValetConfig` | none | `valetConfig` | core/valet.lua:484 |
+
+### Showroom
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `garage:server:getVehiclesForShowroom` | none | `vehicle[]` | sv_api.lua:3781 |
+| `garage:server:getGarageSpawnLocation` | `garageId: number` | `{coords, heading}` | sv_api.lua:3882 |
+| `garage:server:spawnVehicleFromShowroom` | `plate, garageId` | `{success, netId}` | sv_api.lua:3909 |
+| `garage:server:spawnShowroomVehicle` | `{plate, garageId, ...}` | `{success, netId}` | sv_api.lua:4024 |
+
+### Other
+
+| Callback | Parameters | Returns | File:Line |
+|----------|------------|---------|-----------|
+| `loadGaragePreset` | `{preset: string}` | `{success, message}` | sv_api.lua:3665 |
+
+---
+
+## Client Events
+
+### Garage UI
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:openGarage` | `garage, vehicles, garageConfig` | Open garage UI | interaction.lua:1193 |
+| `dusa-garage:client:updateGarageData` | `vehicles` | Update vehicle list | interaction.lua:1239 |
+| `dusa-garage:client:receiveGarageLocations` | `garageLocations[]` | Setup zones | interaction.lua:1144 |
+| `dusa-garage:client:refreshGarageZones` | none | Refresh ox_target zones | interaction.lua:1159 |
+
+### Vehicle Operations
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:vehicleStored` | `plate` | Vehicle stored notification | interaction.lua:1254 |
+| `dusa-garage:client:vehicleSpawned` | `plate, netId` | Vehicle spawned notification | interaction.lua:1275 |
+| `dusa-garage:client:exitVehicle` | none | Force exit vehicle | interaction.lua:540 |
+| `garage:client:startVehicleEngine` | `netId` | Start engine | interaction.lua:1315 |
+| `garage:client:setVehicleHealth` | `networkId, healthProps` | Apply health | main.lua:197 |
+| `garage:client:enableGhostMode` | `networkId, duration` | Enable ghost mode | main.lua:254 |
+
+### Transfer
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:transferResult` | `{success, fee, message}` | Transfer result | main.lua:1260 |
+
+### Job Vehicles
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:receiveJobVehicles` | `{vehicles, jobName}` | Job vehicle list | main.lua:310 |
+| `dusa-garage:client:jobVehicleSpawned` | `{netId, model}` | Job vehicle spawned | main.lua:441 |
+| `dusa-garage:client:jobVehicleReturned` | `{success, message}` | Job vehicle returned | main.lua:560 |
+| `dusa-garage:client:jobVehicleAccessResult` | `data` | Access check result | main.lua:626 |
+| `dusa-garage:client:jobVehicleOwnershipResult` | `data` | Ownership check result | main.lua:638 |
+
+### Repair
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:openRepairView` | `plate, vehicleData` | Open repair UI | repair.lua:1141 |
+| `dusa-garage:client:closeRepairView` | none | Close repair UI | repair.lua:1145 |
+
+### Impound
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:openImpoundMenu` | `vehicleData, isPolice` | Open impound menu | main.lua:1043 |
+
+### Valet
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:startValetDelivery` | `vehicleNetId, npcModel, config` | Start valet NPC | valet.lua:971 |
+| `dusa-garage:client:applyValetVehicleProps` | `vehicleNetId, props` | Apply vehicle props | valet.lua:981 |
+
+### Admin/Editor
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:openAdminEditor` | none | Open admin editor | main.lua:1409 |
+| `dusa-garage:client:garageCreated` | `{success, garageId, message}` | Garage created | main.lua:1503 |
+| `dusa-garage:editor:receiveJobConfig` | `data` | Receive job config | main.lua:650 |
+| `dusa-garage:editor:configUpdateResult` | `data` | Config update result | main.lua:665 |
+| `dusa-garage:editor:openJobConfig` | `garageConfig` | Open job config editor | main.lua:677 |
+
+### Notifications
+
+| Event | Parameters | Purpose | File:Line |
+|-------|------------|---------|-----------|
+| `dusa-garage:client:notify` | `message, type` | Show notification | main.lua:188 |
+| `dusa-garage:client:permissionDenied` | `message` | Permission denied | main.lua:1299 |
+
+---
+
+## NUI Callbacks
+
+### Main Garage
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `getVehiclesPage` | `{garageId, page, limit, ownerIdentifier?}` | `{vehicles[], total, ...}` | interaction.lua:1373 |
+| `storeVehicle` | `{plate, garageId}` | `{success}` | interaction.lua:1413 |
+| `spawnVehicle` | `{plate, garageId}` | `{success}` | interaction.lua:1528 |
+| `previewVehicle` | `{plate, model}` | `{success}` | interaction.lua:1427 |
+| `cancelPreview` | none | `{success}` | interaction.lua:1515 |
+| `closeGarage` | none | `{success}` | interaction.lua:1347 |
+| `transferVehicle` | `{plate, fromGarageId, toGarageId}` | `{success}` | main.lua:1236 |
+| `updateVehicleName` | `{plate, customName}` | `{success}` | interaction.lua:1754 |
+
+### Garage Management
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `createGarage` | `{name, type, locations, settings?}` | `{success, garageId}` | interaction.lua:1693 |
+| `editGarage` | `{garageId, ...updates}` | `{success}` | interaction.lua:1741 |
+| `deleteGarage` | `{garageId}` | `{success}` | interaction.lua:1728 |
+| `getAllPublicGarages` | none | `garage[]` | interaction.lua:1720 |
+| `getPropertyGarages` | none | `garage[]` | interaction.lua:1712 |
+| `getAllGarages` | none | `garage[]` | interaction.lua:1786 |
+| `checkRealEstateAccess` | none | `{hasAccess}` | interaction.lua:1767 |
+| `getAllGaragesForRealEstate` | none | `garage[]` | interaction.lua:1777 |
+
+### Access Management
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `getUserAccess` | `{garageId}` | `{users[]}` | interaction.lua:1547 |
+| `addUserAccess` | `{garageId, playerIdentifier}` | `{success}` | interaction.lua:1560 |
+| `removeUserAccess` | `{garageId, playerIdentifier}` | `{success}` | interaction.lua:1573 |
+| `getNearbyPlayers` | `{distance?}` | `player[]` | interaction.lua:1624 |
+| `switchSharedOwner` | `{ownerIdentifier}` | `{success}` | interaction.lua:1605 |
+
+### Job Vehicles
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `getJobVehicles` | `{garageId}` | `{vehicles[]}` | main.lua:706 |
+| `spawnJobVehicle` | `{vehicleModel, spawnCoords?}` | `{success}` | main.lua:718 |
+| `returnJobVehicle` | `{netId, plate}` | `{success}` | main.lua:778 |
+| `returnNearbyJobVehicle` | none | `{success}` | main.lua:846 |
+| `validateJobVehicleAccess` | `{vehicleModel, jobName}` | `{hasAccess}` | main.lua:895 |
+| `getJobVehicleOwnership` | `{vehicleModel, jobName}` | `{ownership}` | main.lua:902 |
+| `getJobConfig` | none | `jobConfig` | main.lua:909 |
+| `updateJobConfig` | `{jobName, vehicles[]}` | `{success}` | main.lua:916 |
+| `getJobGarages` | none | `garage[]` | main.lua:924 |
+| `deleteJobGarage` | `{garageId}` | `{success}` | main.lua:943 |
+
+### Impound
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `impoundVehicle` | `{plate, reason, impoundType, duration?, fee?}` | `{success}` | main.lua:1057 |
+| `loadImpoundedVehicles` | none | `impound[]` | main.lua:1085 |
+| `updateImpoundDuration` | `{vehicleId, change}` | `{success}` | main.lua:1093 |
+| `releaseImpound` | `{vehicleId, isOwnerRelease, garageName?}` | `{success}` | main.lua:1101 |
+| `releaseImpoundVehicle` | `{vehicleId}` | `{success}` | main.lua:1122 |
+| `getVehicleOwner` | `{plate}` | `{name, identifier}` | main.lua:1213 |
+| `closeImpoundMenu` | none | `{success}` | main.lua:1222 |
+
+### Repair
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `initiateRepair` | `{plate, parts[]}` | `{success, cost}` | repair.lua:1041 |
+| `refillFuel` | `{plate}` | `{success, cost}` | repair.lua:1104 |
+| `closeRepairView` | none | `{success}` | repair.lua:1036 |
+| `openRepairForVehicle` | `{plate}` | `{success}` | interaction.lua:1332 |
+
+### Utility
+
+| Callback | Data | Response | File:Line |
+|----------|------|----------|-----------|
+| `getCurrentCoords` | none | `{x, y, z, heading}` | interaction.lua:1587 |
+| `setWaypoint` | `{x, y}` | `{success}` | main.lua:1334 |
+| `notify` | `{message, type}` | `{success}` | main.lua:1358 |
+| `ui:close` | none | `{success}` | main.lua:1375 |
+| `toggleNuiFocus` | `{focus, cursor}` | `{success}` | main.lua:1428 |
+| `setAdminEditorState` | `{state}` | `{success}` | main.lua:1443 |
+| `loadGaragePreset` | `{preset}` | `{success}` | main.lua:1536 |
+| `executeCommand` | `{command}` | `{success}` | commands.lua:355 |

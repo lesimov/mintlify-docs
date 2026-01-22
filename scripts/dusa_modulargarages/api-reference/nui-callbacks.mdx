@@ -1,0 +1,473 @@
+---
+title: "NUI Callbacks"
+description: "Web UI to Lua communication callbacks."
+---
+
+# NUI Callbacks
+
+NUI callbacks handle communication between the Svelte web UI and Lua client scripts.
+
+## Garage Operations
+
+### getVehiclesPage
+
+Get paginated vehicle list.
+
+```typescript
+// Web UI call
+const result = await postNui('getVehiclesPage', {
+    garageId: number,
+    page: number,
+    limit: number,
+    ownerIdentifier?: string
+});
+```
+
+**Response:**
+```typescript
+{
+    vehicles: Vehicle[],
+    total: number,
+    page: number,
+    totalPages: number
+}
+```
+
+---
+
+### storeVehicle
+
+Store current vehicle.
+
+```typescript
+const result = await postNui('storeVehicle', {
+    plate: string,
+    garageId: number
+});
+```
+
+---
+
+### spawnVehicle
+
+Spawn vehicle from garage.
+
+```typescript
+const result = await postNui('spawnVehicle', {
+    plate: string,
+    garageId: number
+});
+```
+
+---
+
+### previewVehicle
+
+Preview vehicle in 3D.
+
+```typescript
+await postNui('previewVehicle', {
+    plate: string,
+    model: string
+});
+```
+
+---
+
+### cancelPreview
+
+Cancel vehicle preview.
+
+```typescript
+await postNui('cancelPreview', {});
+```
+
+---
+
+### transferVehicle
+
+Transfer vehicle to another garage.
+
+```typescript
+const result = await postNui('transferVehicle', {
+    plate: string,
+    fromGarageId: number,
+    toGarageId: number
+});
+```
+
+---
+
+### updateVehicleName
+
+Update custom vehicle name.
+
+```typescript
+const result = await postNui('updateVehicleName', {
+    plate: string,
+    customName: string
+});
+```
+
+## Garage Management
+
+### createGarage
+
+Create new garage.
+
+```typescript
+const result = await postNui('createGarage', {
+    name: string,
+    type: 'public' | 'property' | 'job',
+    locations: {
+        interaction: Vector3,
+        spawn: SpawnPoint[],
+        parking: Vector3
+    },
+    settings?: object
+});
+```
+
+---
+
+### editGarage
+
+Edit existing garage.
+
+```typescript
+const result = await postNui('editGarage', {
+    garageId: number,
+    name?: string,
+    locations?: object,
+    settings?: object
+});
+```
+
+---
+
+### deleteGarage
+
+Delete garage.
+
+```typescript
+const result = await postNui('deleteGarage', {
+    garageId: number
+});
+```
+
+## Garage Queries
+
+### getAllPublicGarages
+
+```typescript
+const garages = await postNui('getAllPublicGarages', {});
+```
+
+---
+
+### getPropertyGarages
+
+```typescript
+const garages = await postNui('getPropertyGarages', {});
+```
+
+---
+
+### getAllGarages
+
+```typescript
+const garages = await postNui('getAllGarages', {});
+```
+
+---
+
+### getJobGarages
+
+```typescript
+const garages = await postNui('getJobGarages', {});
+```
+
+## Access Management
+
+### getUserAccess
+
+```typescript
+const result = await postNui('getUserAccess', {
+    garageId: number
+});
+// Returns: { users: AccessRecord[] }
+```
+
+---
+
+### addUserAccess
+
+```typescript
+const result = await postNui('addUserAccess', {
+    garageId: number,
+    playerIdentifier: string
+});
+```
+
+---
+
+### removeUserAccess
+
+```typescript
+const result = await postNui('removeUserAccess', {
+    garageId: number,
+    playerIdentifier: string
+});
+```
+
+---
+
+### getNearbyPlayers
+
+```typescript
+const players = await postNui('getNearbyPlayers', {
+    distance?: number  // Default: 10.0
+});
+// Returns: Player[]
+```
+
+## Job Vehicles
+
+### getJobVehicles
+
+```typescript
+const result = await postNui('getJobVehicles', {
+    garageId: number
+});
+```
+
+---
+
+### spawnJobVehicle
+
+```typescript
+const result = await postNui('spawnJobVehicle', {
+    vehicleModel: string,
+    spawnCoords?: Vector4
+});
+```
+
+---
+
+### returnJobVehicle
+
+```typescript
+const result = await postNui('returnJobVehicle', {
+    netId: number,
+    plate: string
+});
+```
+
+---
+
+### returnNearbyJobVehicle
+
+```typescript
+const result = await postNui('returnNearbyJobVehicle', {});
+```
+
+---
+
+### getJobConfig
+
+```typescript
+const config = await postNui('getJobConfig', {});
+```
+
+---
+
+### updateJobConfig
+
+```typescript
+const result = await postNui('updateJobConfig', {
+    jobName: string,
+    vehicles: JobVehicle[]
+});
+```
+
+---
+
+### deleteJobGarage
+
+```typescript
+const result = await postNui('deleteJobGarage', {
+    garageId: number
+});
+```
+
+## Impound
+
+### impoundVehicle
+
+```typescript
+const result = await postNui('impoundVehicle', {
+    plate: string,
+    reason: string,
+    impoundType: 'temporary' | 'permanent' | 'paid',
+    durationHours?: number,
+    releaseFee?: number
+});
+```
+
+---
+
+### loadImpoundedVehicles
+
+```typescript
+const vehicles = await postNui('loadImpoundedVehicles', {});
+```
+
+---
+
+### updateImpoundDuration
+
+```typescript
+const result = await postNui('updateImpoundDuration', {
+    vehicleId: number,
+    change: number  // Hours to add/subtract
+});
+```
+
+---
+
+### releaseImpound
+
+```typescript
+const result = await postNui('releaseImpound', {
+    vehicleId: number,
+    isOwnerRelease: boolean,
+    currentGarageName?: string
+});
+```
+
+---
+
+### releaseImpoundVehicle
+
+```typescript
+const result = await postNui('releaseImpoundVehicle', {
+    vehicleId: number
+});
+```
+
+---
+
+### getVehicleOwner
+
+```typescript
+const owner = await postNui('getVehicleOwner', {
+    plate: string
+});
+// Returns: { name: string, identifier: string }
+```
+
+## Repair & Fuel
+
+### initiateRepair
+
+```typescript
+const result = await postNui('initiateRepair', {
+    plate: string,
+    parts: ('engine' | 'tires' | 'body')[]
+});
+```
+
+---
+
+### refillFuel
+
+```typescript
+const result = await postNui('refillFuel', {
+    plate: string
+});
+```
+
+---
+
+### closeRepairView
+
+```typescript
+await postNui('closeRepairView', {});
+```
+
+---
+
+### openRepairForVehicle
+
+```typescript
+await postNui('openRepairForVehicle', {
+    plate: string
+});
+```
+
+## UI Control
+
+### closeGarage
+
+```typescript
+await postNui('closeGarage', {});
+```
+
+---
+
+### notify
+
+```typescript
+await postNui('notify', {
+    message: string,
+    type: 'success' | 'error' | 'info' | 'warning'
+});
+```
+
+---
+
+### setWaypoint
+
+```typescript
+await postNui('setWaypoint', {
+    x: number,
+    y: number
+});
+```
+
+---
+
+### getCurrentCoords
+
+```typescript
+const coords = await postNui('getCurrentCoords', {});
+// Returns: { x, y, z, heading }
+```
+
+---
+
+### toggleNuiFocus
+
+```typescript
+await postNui('toggleNuiFocus', {
+    focus: boolean,
+    cursor: boolean
+});
+```
+
+## Tablet Integration
+
+For tablet app integration, callbacks are prefixed with `garage:`:
+
+```typescript
+// All tablet callbacks
+await postNui('garage:getAllPublicGarages', {});
+await postNui('garage:getGarageData', { garageId });
+await postNui('garage:getVehiclesPage', { garageId, page, limit });
+await postNui('garage:spawnVehicle', { plate, garageId });
+await postNui('garage:storeVehicle', { plate, garageId });
+await postNui('garage:transferVehicle', { plate, fromGarageId, toGarageId });
+await postNui('garage:repairVehicle', { plate });
+await postNui('garage:refillFuel', { plate });
+// ... etc
+```

@@ -1,0 +1,266 @@
+---
+title: "Shared Configuration"
+description: "Core configuration settings shared between client and server in config/shared.lua"
+---
+
+# Shared Configuration
+
+The `config/shared.lua` file contains settings used by both client and server scripts.
+
+## Locale
+
+```lua
+Config.Locale = "en"  -- Available: en, tr, de, es, fr, it, pl
+```
+
+Supported languages are stored in `locales/*.json`.
+
+## Default Settings
+
+```lua
+Config.DefaultSettings = {
+    MaxVehicles = 50,  -- Maximum vehicles per garage (display)
+}
+```
+
+## Vehicle Transfer Pricing
+
+Configure the vehicle transfer system:
+
+```lua
+Config.Prices.vehicleTransfer = {
+    enabled = true,              -- Enable/disable transfers
+    feeType = "flat",            -- "flat" or "distance"
+    flatFee = 350,               -- Flat fee amount
+    accountType = "bank",        -- "bank" or "cash"
+    
+    -- NULL garage handling
+    allowTransferFromNullGarage = true,
+    allowTransferIfSpawned = true,
+    nullGarageRetrievalFee = 250,
+    
+    -- Distance-based pricing
+    distanceMultiplier = 0.5,    -- Cost per meter
+    minTransferFee = 100,        -- Minimum fee
+    maxTransferFee = 50000,      -- Maximum fee cap
+}
+```
+
+### Fee Calculation
+
+| Fee Type | Calculation |
+|----------|-------------|
+| `flat` | Fixed `flatFee` amount |
+| `distance` | `distance * distanceMultiplier`, clamped to min/max |
+
+## Repair Pricing
+
+Part-based vehicle repair pricing:
+
+```lua
+Config.Prices.repair = {
+    enabled = true,
+    accountType = "bank",
+    pricingMethod = "percentage",  -- "fixed" or "percentage"
+    fullRepairDiscount = 0.0,      -- Discount for full repair
+    
+    parts = {
+        engine = {
+            cost = 500,
+            bone = "engine",
+            displayName = "Engine"
+        },
+        tires = {
+            cost = 300,
+            bones = {"wheel_lf", "wheel_rf", "wheel_lr", "wheel_rr"},
+            displayName = "Tires"
+        },
+        body = {
+            cost = 400,
+            bone = "bodyshell",
+            displayName = "Car Body"
+        }
+    }
+}
+```
+
+### Pricing Methods
+
+| Method | Calculation |
+|--------|-------------|
+| `fixed` | `parts[part].cost` regardless of damage |
+| `percentage` | `damagePercent * parts[part].cost` |
+
+## Fuel Pricing
+
+```lua
+Config.Prices.fuel = {
+    enabled = true,
+    accountType = "bank",
+    pricePerLiter = 2,
+    
+    supportedResources = {
+        "ox_fuel",
+        "LegacyFuel",
+        "cc-fuel"
+    }
+}
+```
+
+## Valet Service
+
+```lua
+Config.Prices.valet = {
+    enabled = true,
+    cost = 500,
+    accountType = "bank",
+    
+    mode = "valet",  -- "valet" (NPC) or "direct" (instant)
+    
+    -- NPC settings (mode = "valet")
+    npcModel = "a_m_m_paparazzi_01",
+    npcSpawnRadius = { min = 30, max = 60 },
+    drivingSpeed = 25.0,
+    drivingStyle = 786468,
+    maxDeliveryTime = 120,
+    npcDespawnDelay = 5000,
+    maxPlayerMoveDistance = 50.0,
+    fallbackToDirect = true,
+    
+    -- Direct mode settings
+    directSpawnRadius = 10.0,
+}
+```
+
+## Repair Showroom
+
+3D vehicle inspection showroom settings:
+
+```lua
+Config.RepairShowroom = {
+    spawnCoords = vector4(228.534, -990.986, -99.424, 179.967),
+    
+    camera = {
+        defaultOffset = vector3(5.0, 5.0, 2.0),
+        minZoom = 3.0,
+        maxZoom = 15.0,
+        zoomSpeed = 0.5,
+        rotationSpeed = 0.125,
+        smoothness = 0.1,
+        fov = 50.0,
+    },
+    
+    partVisibility = {
+        hideAngle = 90.0,
+        updateInterval = 16,       -- ~60fps
+        throttleInterval = 500,
+    },
+    
+    defaultVehicleRange = 400,     -- km per full tank
+}
+```
+
+## Distance Settings
+
+```lua
+Config.Distance = {
+    Interaction = 20.0,  -- Garage interaction range
+    Spawn = 20.0,        -- Vehicle spawn distance
+    Parking = 20.0,      -- Parking detection range
+}
+```
+
+## Keybinds
+
+```lua
+Config.Keys = {
+    Interact = 38,   -- E key
+    Cancel = 177,    -- BACKSPACE
+}
+```
+
+## Real Estate Integration
+
+```lua
+Config.RealEstate = {
+    Enabled = true,
+    
+    Jobs = {
+        ["realestate"] = { minGrade = 0 },
+        ["property"] = { minGrade = 1 },
+        ["emlak"] = { minGrade = 0 },
+    },
+    
+    Permissions = {
+        CreateGarages = true,
+        EditAllGarages = true,
+        DeleteAllGarages = true,
+        ManageAllAccess = true,
+        ViewAllGarages = true,
+    }
+}
+```
+
+## Mechanic Integration
+
+Lock vehicles under active mechanic work orders:
+
+```lua
+Config.MechanicIntegration = {
+    Enabled = true,
+    ResourceName = "dusa_mechanicv2",
+    LockOnOrderAccepted = true,
+    
+    LockingStatuses = {
+        "in_progress",
+    },
+}
+```
+
+## Impound System
+
+```lua
+Config.Impound = {
+    Enabled = true,
+    
+    AllowedJobs = {
+        "police", "sheriff", "tow", "towtruck", "mechanic"
+    },
+    
+    DefaultDuration = 24,    -- hours
+    MaxDuration = 720,       -- 30 days
+    MinDuration = 1,
+    
+    AutoImpoundFee = 5000,   -- For NULL garage vehicles
+}
+```
+
+## Job Vehicle Limits
+
+```lua
+Config.JobVehicleLimits = {
+    MaxVehiclesPerPlayer = 3,
+    CleanupInterval = 300000,    -- 5 minutes
+    AbandonTimeout = 1800000,    -- 30 minutes
+}
+```
+
+## Job Vehicle Validation
+
+```lua
+Config.JobVehicleValidation = {
+    RequiredFields = {
+        "vehicle", "displayName", "minGrade", "category", "description"
+    },
+    FieldTypes = {
+        vehicle = "string",
+        displayName = "string",
+        minGrade = "number",
+        category = "string",
+        description = "string"
+    },
+    Constraints = {
+        minGrade = { min = 0, max = 10 }
+    }
+}
+```

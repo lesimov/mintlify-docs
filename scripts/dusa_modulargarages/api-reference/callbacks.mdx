@@ -1,0 +1,359 @@
+---
+title: "Server Callbacks"
+description: "Complete reference for all lib.callback registered server endpoints."
+---
+
+# Server Callbacks
+
+All server callbacks use `ox_lib` callback system and can be called from client using `lib.callback.await`.
+
+## Garage Operations
+
+### storeVehicle
+
+Store a vehicle in a garage.
+
+```lua
+lib.callback.register('dusa-garage:server:storeVehicle', function(source, plate, garageId)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle license plate |
+| `garageId` | number | Target garage ID |
+
+**Returns:** `{success: boolean, message?: string}`
+
+---
+
+### spawnVehicle
+
+Spawn a vehicle from a garage.
+
+```lua
+lib.callback.register('dusa-garage:server:spawnVehicle', function(source, plate, garageId)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle license plate |
+| `garageId` | number | Source garage ID |
+
+**Returns:** `{success: boolean, netId?: number, message?: string}`
+
+---
+
+### getGarageData
+
+Get garage information and vehicles.
+
+```lua
+lib.callback.register('dusa-garage:server:getGarageData', function(source, garageId, ownerIdentifier)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `garageId` | number | Garage ID |
+| `ownerIdentifier` | string? | Optional owner filter |
+
+**Returns:** `{garage: table, vehicles: table[], config: table}`
+
+---
+
+### getVehiclesPage
+
+Get paginated vehicle list.
+
+```lua
+lib.callback.register('dusa-garage:server:getVehiclesPage', function(source, data)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data.garageId` | number | Garage ID |
+| `data.page` | number | Page number (1-indexed) |
+| `data.limit` | number | Items per page |
+| `data.ownerIdentifier` | string? | Owner filter |
+
+**Returns:** `{vehicles: table[], total: number, page: number, totalPages: number}`
+
+---
+
+### transferVehicle
+
+Transfer vehicle between garages.
+
+```lua
+lib.callback.register('dusa-garage:server:transferVehicle', function(source, plate, fromGarageId, toGarageId)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle license plate |
+| `fromGarageId` | number | Source garage ID |
+| `toGarageId` | number | Destination garage ID |
+
+**Returns:** `{success: boolean, fee?: number, message?: string}`
+
+## Garage Management
+
+### createGarage
+
+Create a new garage.
+
+```lua
+lib.callback.register('dusa-garage:server:createGarage', function(source, data)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `data.name` | string | Unique garage name |
+| `data.type` | string | "public", "property", or "job" |
+| `data.locations` | table | Interaction/spawn/parking coordinates |
+| `data.settings` | table? | Optional settings |
+
+**Returns:** `{success: boolean, garageId?: number, message?: string}`
+
+---
+
+### editGarage
+
+Edit existing garage.
+
+```lua
+lib.callback.register('dusa-garage:server:editGarage', function(source, garageId, updateData)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `garageId` | number | Garage ID to edit |
+| `updateData` | table | Fields to update |
+
+**Returns:** `{success: boolean, message?: string}`
+
+---
+
+### deleteGarage
+
+Delete a garage.
+
+```lua
+lib.callback.register('dusa-garage:server:deleteGarage', function(source, garageId)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `garageId` | number | Garage ID to delete |
+
+**Returns:** `{success: boolean, message?: string}`
+
+## Garage Queries
+
+### getAllPublicGarages
+
+Get all public garages.
+
+```lua
+lib.callback.register('dusa-garage:server:getAllPublicGarages', function(source)
+```
+
+**Returns:** `table[]` - Array of garage objects
+
+---
+
+### getPropertyGarages
+
+Get garages owned by player.
+
+```lua
+lib.callback.register('dusa-garage:server:getPropertyGarages', function(source)
+```
+
+**Returns:** `table[]` - Array of property garages
+
+---
+
+### getJobGarages
+
+Get job garages player has access to.
+
+```lua
+lib.callback.register('dusa-garage:server:getJobGarages', function(source)
+```
+
+**Returns:** `table[]` - Array of job garages
+
+---
+
+### getAllGarages
+
+Get all garages (admin only).
+
+```lua
+lib.callback.register('dusa-garage:server:getAllGarages', function(source)
+```
+
+**Returns:** `table[]` - Array of all garages
+
+## Access Management
+
+### getUserAccess
+
+Get users with access to garage.
+
+```lua
+lib.callback.register('dusa-garage:editor:getUserAccess', function(source, garageId)
+```
+
+**Returns:** `{users: table[]}` - Array of access records
+
+---
+
+### addUserAccess
+
+Grant garage access to user.
+
+```lua
+lib.callback.register('dusa-garage:editor:addUserAccess', function(source, garageId, playerIdentifier)
+```
+
+**Returns:** `{success: boolean, message?: string}`
+
+---
+
+### removeUserAccess
+
+Revoke garage access from user.
+
+```lua
+lib.callback.register('dusa-garage:editor:removeUserAccess', function(source, garageId, playerIdentifier)
+```
+
+**Returns:** `{success: boolean, message?: string}`
+
+## Impound System
+
+### impoundVehicle
+
+Impound a vehicle.
+
+```lua
+lib.callback.register('dusa-garage:server:impoundVehicle', function(source, plate, reason, impoundType, durationHours, releaseFee)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle plate |
+| `reason` | string | Impound reason |
+| `impoundType` | string | "temporary", "permanent", or "paid" |
+| `durationHours` | number? | Hours for temporary impound |
+| `releaseFee` | number? | Fee for paid impound |
+
+**Returns:** `{success: boolean, impoundId?: number}`
+
+---
+
+### getImpoundedVehicles
+
+Get all impounded vehicles.
+
+```lua
+lib.callback.register('dusa-garage:server:getImpoundedVehicles', function(source)
+```
+
+**Returns:** `table[]` - Array of impound records
+
+---
+
+### releaseImpound
+
+Release vehicle from impound.
+
+```lua
+lib.callback.register('dusa-garage:server:releaseImpound', function(source, vehicleId, isOwnerRelease, currentGarageName)
+```
+
+**Returns:** `{success: boolean, message?: string}`
+
+## Repair & Fuel
+
+### repairVehicle
+
+Repair vehicle parts.
+
+```lua
+lib.callback.register('dusa-garage:server:repairVehicle', function(source, plate)
+```
+
+**Returns:** `{success: boolean, cost?: number, message?: string}`
+
+---
+
+### refillFuel
+
+Refill vehicle fuel.
+
+```lua
+lib.callback.register('dusa-garage:server:refillFuel', function(source, plate, fuelResource)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle plate |
+| `fuelResource` | string | Fuel resource name (ox_fuel, etc.) |
+
+**Returns:** `{success: boolean, cost?: number, liters?: number}`
+
+## Valet Service
+
+### requestValet
+
+Request valet delivery.
+
+```lua
+lib.callback.register('dusa-garage:server:requestValet', function(source, plate, garageId, playerCoords)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `plate` | string | Vehicle plate |
+| `garageId` | number | Source garage |
+| `playerCoords` | vector3 | Delivery location |
+
+**Returns:** `{success: boolean, message?: string}`
+
+---
+
+### getValetConfig
+
+Get valet configuration.
+
+```lua
+lib.callback.register('dusa-garage:server:getValetConfig', function(source)
+```
+
+**Returns:** `{enabled: boolean, cost: number, mode: string, ...}`
+
+## Showroom
+
+### getVehiclesForShowroom
+
+Get vehicles for 3D showroom.
+
+```lua
+lib.callback.register('garage:server:getVehiclesForShowroom', function(source)
+```
+
+**Returns:** `table[]` - Vehicles with full props
+
+---
+
+### spawnVehicleFromShowroom
+
+Spawn vehicle from showroom.
+
+```lua
+lib.callback.register('garage:server:spawnVehicleFromShowroom', function(source, plate, garageId)
+```
+
+**Returns:** `{success: boolean, netId?: number}`

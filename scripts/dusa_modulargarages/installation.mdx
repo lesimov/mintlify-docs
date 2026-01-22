@@ -1,0 +1,172 @@
+---
+title: "Installation"
+description: "Step-by-step guide to install and configure Dusa Modular Garages on your FiveM server."
+---
+
+# Installation Guide
+
+## Prerequisites
+
+Before installing, ensure you have the following resources installed and running:
+
+<Steps>
+  <Step title="Install Dependencies">
+    Download and install the required dependencies:
+    
+    ```bash
+    # Required resources
+    - dusa_bridge (framework abstraction)
+    - oxmysql (database driver)
+    - ox_lib (utility library)
+    - screenshot-basic (vehicle photos)
+    ```
+  </Step>
+  
+  <Step title="Download the Resource">
+    Place the `dusa_modulargarages` folder in your resources directory:
+    
+    ```
+    resources/
+    └── [dusa]/
+        └── dusa_modulargarages/
+    ```
+  </Step>
+  
+  <Step title="Database Setup">
+    Run the consolidated schema to create all required tables:
+    
+    ```sql
+    -- Execute sql/release/consolidated_schema.sql
+    -- This creates 8 tables:
+    -- - dusa_garages
+    -- - dusa_vehicle_metadata
+    -- - dusa_vehicle_impounds
+    -- - dusa_garage_access
+    -- - dusa_vehicle_sharing
+    -- - dusa_persistent_vehicles
+    -- - dusa_vehicle_photos
+    -- - dusa_migrations
+    ```
+    
+    <Note>
+      If you have automatic database migration enabled (`Config.Server.Database.AutoMigrate = true`), 
+      the schema will be created automatically on first resource start.
+    </Note>
+  </Step>
+  
+  <Step title="Configure server.cfg">
+    Add the resource to your `server.cfg`:
+    
+    ```cfg
+    # Dependencies first
+    ensure oxmysql
+    ensure ox_lib
+    ensure dusa_bridge
+    ensure screenshot-basic
+    
+    # Then the garage resource
+    ensure dusa_modulargarages
+    ```
+  </Step>
+  
+  <Step title="Build the Web UI">
+    Navigate to the web folder and build the frontend:
+    
+    ```bash
+    cd resources/[dusa]/dusa_modulargarages/web
+    npm install
+    npm run build
+    ```
+    
+    <Warning>
+      Always run `npm run build` after any UI changes. The built files are required for the in-game interface.
+    </Warning>
+  </Step>
+</Steps>
+
+## Migration from Other Garage Scripts
+
+Dusa Modular Garages includes migration adapters for popular garage scripts:
+
+| Source Script | Adapter File | Support Level |
+|---------------|--------------|---------------|
+| `qb-garages` | `qb-garages.lua` | Full |
+| `qbx_garages` | `qbx_garages.lua` | Full |
+| `cd_garage` | `cd_garage.lua` | Full |
+| `esx_garage` | `esx_garage.lua` | Full |
+| `jg-advancedgarages` | `jg-advancedgarages.lua` | Full |
+| `loaf_garage` | `loaf_garage.lua` | Partial |
+| `lunar_garage` | `lunar_garage.lua` | Partial |
+| `okokGarage` | `okokGarage.lua` | Full |
+| `op-garages` | `op-garages.lua` | Full |
+| `qs_advancedgarages` | `qs_advancedgarages.lua` | Full |
+| `rcore_garage` | `rcore_garage.lua` | Partial |
+| `tgiann_realparking` | `tgiann_realparking.lua` | Full |
+| `vms_garagesv2` | `vms_garagesv2.lua` | Full |
+| `vrs_garage` | `vrs_garage.lua` | Partial |
+
+### Running Migration
+
+```lua
+-- Server console command
+migrateTo dusa_modulargarages [source_script]
+
+-- Example
+migrateTo dusa_modulargarages qb-garages
+```
+
+## Directory Structure
+
+```
+dusa_modulargarages/
+├── client/                 # Client-side scripts
+│   ├── core/              # Core client modules
+│   │   ├── interaction.lua
+│   │   ├── repair.lua
+│   │   ├── showroom.lua
+│   │   └── valet.lua
+│   ├── main.lua           # Client entry point
+│   └── tablet_integration.lua
+├── server/                 # Server-side scripts
+│   ├── core/              # Core server modules
+│   │   ├── database.lua
+│   │   ├── garage.lua
+│   │   └── validation.lua
+│   ├── api/               # API endpoints
+│   │   ├── sv_api.lua
+│   │   └── sv_repair.lua
+│   └── migration/         # Migration adapters
+├── config/                 # Configuration files
+│   ├── shared.lua
+│   ├── server.lua
+│   ├── client.lua
+│   ├── job_vehicles.lua
+│   └── modules/           # Module configs
+├── modules/               # Optional modules
+│   ├── mileage/
+│   ├── persistent_parking/
+│   ├── garage_sharing/
+│   └── vehicle_photographer/
+├── web/                   # Svelte frontend
+│   ├── src/
+│   └── build/             # Built files (generated)
+├── sql/                   # Database schemas
+│   ├── release/
+│   └── migrations/
+├── locales/               # Language files
+└── presets/               # Garage presets
+```
+
+## Verification
+
+After installation, verify everything is working:
+
+1. **Check Resource Start**: Look for startup messages in server console
+2. **Database Tables**: Verify all 8 tables were created
+3. **Blips**: Check if garage blips appear on the map
+4. **Interaction**: Test approaching a garage zone
+
+```lua
+-- Debug command to verify installation
+/garage debug status
+```

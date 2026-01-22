@@ -179,6 +179,71 @@
         ]
       },
       {
+        "tab": "DUSA Modular Garages",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "scripts/dusa_modulargarages/introduction",
+              "scripts/dusa_modulargarages/installation",
+              "scripts/dusa_modulargarages/quick-start"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "scripts/dusa_modulargarages/configuration/overview",
+              "scripts/dusa_modulargarages/configuration/shared",
+              "scripts/dusa_modulargarages/configuration/server",
+              "scripts/dusa_modulargarages/configuration/client",
+              "scripts/dusa_modulargarages/configuration/job-vehicles"
+            ]
+          },
+          {
+            "group": "Modules",
+            "pages": [
+              "scripts/dusa_modulargarages/modules/overview",
+              "scripts/dusa_modulargarages/modules/mileage",
+              "scripts/dusa_modulargarages/modules/persistent-parking",
+              "scripts/dusa_modulargarages/modules/garage-sharing",
+              "scripts/dusa_modulargarages/modules/vehicle-photographer"
+            ]
+          },
+          {
+            "group": "Server",
+            "pages": [
+              "scripts/dusa_modulargarages/server/overview"
+            ]
+          },
+          {
+            "group": "Client",
+            "pages": [
+              "scripts/dusa_modulargarages/client/overview"
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "scripts/dusa_modulargarages/api-reference/overview",
+              "scripts/dusa_modulargarages/api-reference/callbacks",
+              "scripts/dusa_modulargarages/api-reference/events",
+              "scripts/dusa_modulargarages/api-reference/nui-callbacks",
+              "scripts/dusa_modulargarages/api-reference/exports"
+            ]
+          },
+          {
+            "group": "AI Reference",
+            "pages": [
+              "scripts/dusa_modulargarages/ai-internal/codebase-map",
+              "scripts/dusa_modulargarages/ai-internal/database-schema",
+              "scripts/dusa_modulargarages/ai-internal/api-reference",
+              "scripts/dusa_modulargarages/ai-internal/troubleshooting",
+              "scripts/dusa_modulargarages/ai-internal/feature-keywords"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {

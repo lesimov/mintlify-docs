@@ -1,0 +1,244 @@
+---
+title: "Job Vehicles Configuration"
+description: "Configure job-specific vehicles with grade restrictions in config/job_vehicles.lua"
+---
+
+# Job Vehicles Configuration
+
+The `config/job_vehicles.lua` file defines vehicles available to specific jobs with grade-based access control.
+
+## Structure
+
+```lua
+Config.JobVehicles = {
+    ["job_name"] = {
+        {
+            vehicle = "model_name",
+            displayName = "Display Name",
+            minGrade = 0,
+            category = "category_name",
+            description = "Vehicle description",
+            vehicleType = "car"  -- "car", "boat", or "aircraft"
+        },
+        -- More vehicles...
+    },
+    -- More jobs...
+}
+```
+
+## Example Configuration
+
+```lua
+Config.JobVehicles = {
+    -- Police Department
+    ["police"] = {
+        {
+            vehicle = "police",
+            displayName = "Standard Cruiser",
+            minGrade = 0,
+            category = "patrol",
+            description = "Basic patrol vehicle",
+            vehicleType = "car"
+        },
+        {
+            vehicle = "police2",
+            displayName = "Unmarked Cruiser",
+            minGrade = 2,
+            category = "patrol",
+            description = "Unmarked patrol vehicle for detectives",
+            vehicleType = "car"
+        },
+        {
+            vehicle = "polmav",
+            displayName = "Police Maverick",
+            minGrade = 4,
+            category = "air_unit",
+            description = "Air support helicopter",
+            vehicleType = "aircraft"
+        },
+        {
+            vehicle = "predator",
+            displayName = "Police Boat",
+            minGrade = 3,
+            category = "marine_unit",
+            description = "Marine patrol vessel",
+            vehicleType = "boat"
+        }
+    },
+    
+    -- Ambulance/EMS
+    ["ambulance"] = {
+        {
+            vehicle = "ambulance",
+            displayName = "Standard Ambulance",
+            minGrade = 0,
+            category = "emergency",
+            description = "Basic emergency response vehicle",
+            vehicleType = "car"
+        },
+        {
+            vehicle = "firetruk",
+            displayName = "Fire Truck",
+            minGrade = 1,
+            category = "fire",
+            description = "Fire suppression vehicle",
+            vehicleType = "car"
+        }
+    },
+    
+    -- Mechanic
+    ["mechanic"] = {
+        {
+            vehicle = "towtruck",
+            displayName = "Tow Truck",
+            minGrade = 0,
+            category = "towing",
+            description = "Vehicle recovery service",
+            vehicleType = "car"
+        },
+        {
+            vehicle = "flatbed",
+            displayName = "Flatbed Truck",
+            minGrade = 2,
+            category = "towing",
+            description = "Large vehicle transport",
+            vehicleType = "car"
+        }
+    }
+}
+```
+
+## Field Descriptions
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `vehicle` | string | ✅ | Spawn name of the vehicle model |
+| `displayName` | string | ✅ | Name shown in the UI |
+| `minGrade` | number | ✅ | Minimum job grade required (0-10) |
+| `category` | string | ✅ | Category for UI grouping |
+| `description` | string | ✅ | Description shown in UI |
+| `vehicleType` | string | ✅ | Vehicle class: `car`, `boat`, or `aircraft` |
+
+## Grade System
+
+Grades typically follow this structure (varies by framework):
+
+| Grade | Typical Role |
+|-------|--------------|
+| 0 | Trainee/Recruit |
+| 1 | Regular Employee |
+| 2 | Senior Employee |
+| 3 | Supervisor |
+| 4 | Manager |
+| 5+ | Director/Chief |
+
+## Categories
+
+Categories group vehicles in the UI. Common categories:
+
+### Police
+- `patrol` - Standard patrol vehicles
+- `speed_unit` - High-speed pursuit vehicles
+- `air_unit` - Helicopters
+- `marine_unit` - Boats
+
+### EMS/Fire
+- `emergency` - Ambulances
+- `fire` - Fire trucks
+- `rescue` - Rescue vehicles
+
+### Mechanic
+- `towing` - Tow trucks
+- `repair` - Mobile repair vehicles
+
+## Validation Rules
+
+The system validates all job vehicle entries against these rules:
+
+```lua
+Config.JobVehicleValidation = {
+    RequiredFields = {
+        "vehicle", "displayName", "minGrade", "category", "description"
+    },
+    FieldTypes = {
+        vehicle = "string",
+        displayName = "string",
+        minGrade = "number",
+        category = "string",
+        description = "string"
+    },
+    Constraints = {
+        minGrade = { min = 0, max = 10 }
+    }
+}
+```
+
+## Job Vehicle Limits
+
+```lua
+Config.JobVehicleLimits = {
+    MaxVehiclesPerPlayer = 3,        -- Max spawned job vehicles per player
+    CleanupInterval = 300000,        -- Cleanup check (5 minutes)
+    AbandonTimeout = 1800000,        -- Vehicle abandon timeout (30 minutes)
+}
+```
+
+### Vehicle Cleanup
+
+Job vehicles are automatically cleaned up when:
+- Player logs out
+- Player changes job
+- Vehicle abandoned for longer than `AbandonTimeout`
+- Player exceeds `MaxVehiclesPerPlayer`
+
+## Hot Reload
+
+Job vehicle configuration supports hot reload:
+
+```lua
+Config.JobVehicleHotReload = {
+    Enabled = true,
+    ValidateOnReload = true,    -- Validate config on reload
+    AdminOnly = true,           -- Only admins can trigger reload
+    NotifyPlayers = true,       -- Notify when config changes
+}
+```
+
+### Triggering Hot Reload
+
+```lua
+-- Server console
+garage reloadJobVehicles
+
+-- Or via callback
+TriggerServerEvent('dusa-garage:editor:updateJobConfig', newConfig)
+```
+
+## In-Game Editor
+
+Job vehicles can be managed via the in-game editor:
+
+1. Open admin editor (`/garage editor`)
+2. Navigate to job garage
+3. Click "Edit Job Vehicles"
+4. Add/edit/remove vehicles
+
+Changes made via editor are saved to `config/job_vehicles.lua`.
+
+## Framework Compatibility
+
+Job detection works with any framework through `dusa_bridge`:
+
+```lua
+-- How job vehicles are accessed
+local player = Framework.GetPlayer(source)
+local jobName = player.Job.Name
+local jobGrade = player.Job.Grade
+
+-- Check vehicle access
+for _, vehicle in pairs(Config.JobVehicles[jobName] or {}) do
+    if jobGrade >= vehicle.minGrade then
+        -- Player can access this vehicle
+    end
+end
+```

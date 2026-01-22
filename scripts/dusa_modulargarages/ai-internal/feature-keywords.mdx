@@ -1,0 +1,166 @@
+---
+title: "Feature Keywords"
+description: "Keyword to file/callback/config mapping for AI semantic search."
+---
+
+# Feature Keywords Index
+
+Mapping of user queries to relevant files, callbacks, and configuration.
+
+## Keyword → File Mapping
+
+### Garage Operations
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| store vehicle, park car, save car | server/api/sv_api.lua:1063, client/core/interaction.lua:1413 | `dusa-garage:server:storeVehicle` |
+| spawn vehicle, get car, retrieve car | server/api/sv_api.lua:1191, client/core/interaction.lua:1528 | `dusa-garage:server:spawnVehicle` |
+| vehicle list, show vehicles, garage contents | server/api/sv_api.lua:4176, client/core/interaction.lua:1373 | `dusa-garage:server:getVehiclesPage` |
+| transfer vehicle, move car, relocate | server/api/sv_api.lua:2820, client/main.lua:1236 | `dusa-garage:server:transferVehicle` |
+| rename vehicle, custom name, nickname | server/api/sv_api.lua:2877, client/core/interaction.lua:1754 | `dusa-garage:server:updateVehicleName` |
+
+### Garage Management
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| create garage, add garage, new garage | server/api/sv_api.lua:1543, client/core/interaction.lua:1693 | `dusa-garage:server:createGarage` |
+| edit garage, modify garage, update garage | server/api/sv_api.lua:1768, client/core/interaction.lua:1741 | `dusa-garage:server:editGarage` |
+| delete garage, remove garage | server/api/sv_api.lua:1714, client/core/interaction.lua:1728 | `dusa-garage:server:deleteGarage` |
+| garage locations, spawn points | server/core/spawn_zones.lua, config/shared.lua | Database `locations` JSON |
+| garage blips, map markers | client/main.lua, config/client.lua | `Config.Client.Effects.BlipVisibility` |
+
+### Impound System
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| impound vehicle, seize car, confiscate | server/api/sv_api.lua:2957, client/main.lua:1057 | `dusa-garage:server:impoundVehicle` |
+| release impound, free vehicle, retrieve impounded | server/api/sv_api.lua:3171, client/main.lua:1101 | `dusa-garage:server:releaseImpound` |
+| impound list, seized vehicles | server/api/sv_api.lua:3049, client/main.lua:1085 | `dusa-garage:server:getImpoundedVehicles` |
+| impound duration, extend impound | server/api/sv_api.lua:3118, client/main.lua:1093 | `dusa-garage:server:updateImpoundDuration` |
+| impound permissions, police impound | config/shared.lua | `Config.Impound.AllowedJobs` |
+
+### Repair & Fuel
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| repair vehicle, fix car, mechanic | server/api/sv_repair.lua:221, client/core/repair.lua:1041 | `dusa-garage:server:repairVehicle` |
+| refuel, fill gas, fuel up | server/api/sv_repair.lua:398, client/core/repair.lua:1104 | `dusa-garage:server:refillFuel` |
+| repair cost, repair price | config/shared.lua | `Config.Prices.repair.parts` |
+| fuel price, gas cost | config/shared.lua | `Config.Prices.fuel.pricePerLiter` |
+| repair showroom, 3D repair, vehicle inspection | client/core/showroom.lua, client/core/repair.lua | `Config.RepairShowroom` |
+
+### Job Vehicles
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| job vehicle, work car, company vehicle | server/api/sv_api.lua:2354, client/main.lua:706 | `dusa-garage:server:getJobVehicles` |
+| spawn job vehicle, get work car | server/main.lua, client/main.lua:718 | `dusa-garage:server:spawnJobVehicle` |
+| return job vehicle, store work car | server/main.lua, client/main.lua:778 | `dusa-garage:server:returnJobVehicleDriveIn` |
+| job grade, rank requirement | config/job_vehicles.lua, server/core/modules/grade_validator.lua | `Config.JobVehicles` |
+| police vehicle, ambulance, mechanic vehicle | config/job_vehicles.lua | `Config.JobVehicles["police"]` |
+
+### Valet Service
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| valet, deliver car, bring vehicle | server/core/valet.lua:476, client/core/valet.lua | `dusa-garage:server:requestValet` |
+| valet cost, delivery fee | config/shared.lua | `Config.Prices.valet.cost` |
+| valet npc, driver | config/shared.lua, client/core/valet.lua | `Config.Prices.valet.npcModel` |
+| direct spawn, instant delivery | config/shared.lua | `Config.Prices.valet.mode = "direct"` |
+
+### Access & Sharing
+
+| Keywords | Primary Files | Callbacks |
+|----------|---------------|-----------|
+| share garage, give access, grant permission | server/api/sv_api.lua:1481, client/core/interaction.lua:1560 | `dusa-garage:editor:addUserAccess` |
+| remove access, revoke permission | server/api/sv_api.lua:1518, client/core/interaction.lua:1573 | `dusa-garage:editor:removeUserAccess` |
+| shared users, access list | server/api/sv_api.lua:1460, client/core/interaction.lua:1547 | `dusa-garage:editor:getUserAccess` |
+| nearby players, share to player | client/core/interaction.lua:1624 | NUI `getNearbyPlayers` |
+| share vehicle, vehicle sharing | modules/garage_sharing/server.lua | `GarageSharingConfig` |
+
+### Modules
+
+| Keywords | Primary Files | Config |
+|----------|---------------|--------|
+| mileage, odometer, distance traveled | modules/mileage/client.lua, modules/mileage/server.lua | `MileageConfig` |
+| persistent parking, world spawn | modules/persistent_parking/client.lua, modules/persistent_parking/server.lua | `PersistentParkingConfig` |
+| parking fee, hourly rate | modules/persistent_parking/server.lua | `PersistentParkingConfig.fees` |
+| vehicle photo, image capture | modules/vehicle_photographer/client.lua | N/A |
+| photo studio, green screen | stream/jim_g_green_screen_v1.ymap | `Config.RepairShowroom.spawnCoords` |
+
+### Database
+
+| Keywords | Primary Files | Table |
+|----------|---------------|-------|
+| garage table, garage database | server/core/database.lua | `dusa_garages` |
+| vehicle metadata, mileage data | server/core/database.lua | `dusa_vehicle_metadata` |
+| impound records, impound database | server/core/database.lua | `dusa_vehicle_impounds` |
+| access records, sharing database | modules/garage_sharing/server.lua | `dusa_garage_access` |
+| persistent vehicles, parked cars | modules/persistent_parking/server.lua | `dusa_persistent_vehicles` |
+| migration, schema update | server/database/migration.lua | `dusa_migrations` |
+
+### Configuration
+
+| Keywords | Primary Files | Config Key |
+|----------|---------------|------------|
+| debug, logging | shared/utils/debug.lua, config/shared.lua | `Config.Debug` |
+| locale, language | config/shared.lua, locales/*.json | `Config.Locale` |
+| transfer price, transfer fee | config/shared.lua | `Config.Prices.vehicleTransfer` |
+| real estate, property manager | config/shared.lua | `Config.RealEstate` |
+| mechanic lock, workshop integration | config/shared.lua | `Config.MechanicIntegration` |
+| rate limit, request limit | config/server.lua | `Config.Server.Security.RateLimiting` |
+
+## User Question → Feature Mapping
+
+### "How do I..."
+
+| Question | Feature | Files |
+|----------|---------|-------|
+| "How do I store a vehicle?" | Store Vehicle | interaction.lua, sv_api.lua |
+| "How do I share my garage?" | Garage Sharing | garage_sharing module |
+| "How do I set up a job garage?" | Job Garages | job_vehicles.lua, sv_api.lua |
+| "How do I enable mileage tracking?" | Mileage Module | mileage module config |
+| "How do I impound a vehicle?" | Impound System | sv_api.lua, Config.Impound |
+
+### "Why can't I..."
+
+| Question | Likely Cause | Check |
+|----------|--------------|-------|
+| "Why can't I spawn my vehicle?" | Impounded/mechanic locked | dusa_vehicle_impounds, mechanic integration |
+| "Why can't I see the UI?" | NUI not built | web/build/ folder |
+| "Why can't I access the garage?" | Permissions/type mismatch | dusa_garage_access, garage type |
+| "Why can't I transfer?" | Insufficient funds/spawned | Config.Prices.vehicleTransfer, vehicle state |
+| "Why can't I share garage?" | Module disabled | GarageSharingConfig.enabled |
+
+### "Where is..."
+
+| Question | Location |
+|----------|----------|
+| "Where is the config?" | config/shared.lua, config/server.lua, config/client.lua |
+| "Where are spawn points defined?" | dusa_garages.locations JSON column |
+| "Where is the UI code?" | web/src/components/ |
+| "Where are callbacks registered?" | server/api/sv_api.lua, server/api/sv_repair.lua |
+| "Where is the database schema?" | sql/release/consolidated_schema.sql |
+
+## Search Patterns
+
+### For Code Changes
+
+| What to Change | Search Pattern | Files to Modify |
+|----------------|----------------|-----------------|
+| Add new callback | `lib.callback.register` | server/api/sv_api.lua |
+| Add new NUI callback | `RegisterNUICallback` | client/core/interaction.lua, client/main.lua |
+| Add new event | `RegisterNetEvent` | client/main.lua, client/core/*.lua |
+| Add new config option | `Config.` | config/shared.lua |
+| Add new database table | `CREATE TABLE` | sql/release/consolidated_schema.sql |
+| Add new locale key | JSON key | locales/*.json |
+
+### For Debugging
+
+| Issue Area | Search Pattern | Files to Check |
+|------------|----------------|----------------|
+| Vehicle spawn | `spawnVehicle`, `CreateVehicle` | sv_api.lua, interaction.lua |
+| Database | `MySQL.query`, `MySQL.insert` | database.lua, sv_api.lua |
+| Permissions | `checkPermission`, `ValidateOwnership` | validation.lua, vehicle_ownership.lua |
+| UI state | `SendNUIMessage`, `SetNuiFocus` | interaction.lua, main.lua |
+| Zone detection | `ox_target`, `addBoxZone` | interaction.lua |
