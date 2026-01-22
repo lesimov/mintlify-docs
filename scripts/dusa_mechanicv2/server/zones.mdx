@@ -1,0 +1,367 @@
+---
+title: "Zone System"
+description: "Server-side zone management for tuning, storage, shop, and repair areas"
+---
+
+# Zone System
+
+The zone system manages different interactive areas including tuning zones, storage stashes, shop ped zones, and repair areas.
+
+## Overview
+
+The zone system consists of five main components:
+
+1. **Tuning Zones** - Vehicle modification areas
+2. **Storage Zones** - Inventory stash registration
+3. **Shop Zones** - Shop ped/NPC configuration
+4. **Repair Zones** - Repair area callbacks
+5. **Repair Ped Zones** - NPC auto-repair system
+
+## Tuning Zones
+
+### Zone Registration
+
+```lua
+-- Register tuning zone for a shop
+TuningZones.register({
+    id = 'shop_1_tuning',
+    shopId = 1,
+    coords = vector3(-339.0, -136.0, 39.0),
+    radius = 5.0,
+    heading = 70.0,
+    allowedJobs = { 'mechanic' },
+    minGrade = 0,
+})
+```
+
+### Zone Callbacks
+
+```lua
+-- Player enters tuning zone
+lib.callback.register('mechanic:zone:enterTuning', function(source, zoneId)
+    local zone = TuningZones.get(zoneId)
+    if not zone then return { success = false } end
+
+    -- Check job permission
+    if not TuningZones.canAccess(source, zone) then
+        return { success = false, error = 'No access' }
+    end
+
+    -- Get available mods for this zone
+    local availableMods = TuningZones.getAvailableMods(zone.shopId)
+
+    return {
+        success = true,
+        zone = zone,
+        mods = availableMods,
+    }
+end)
+```
+
+### Database Schema
+
+```sql
+CREATE TABLE ds_mechanic_zones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    zone_type ENUM('tuning', 'storage', 'shop', 'repair') NOT NULL,
+    shop_id INT NOT NULL,
+    name VARCHAR(64),
+    coords JSON NOT NULL,
+    radius FLOAT DEFAULT 5.0,
+    heading FLOAT DEFAULT 0.0,
+    settings JSON,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_shop_id (shop_id),
+    INDEX idx_zone_type (zone_type),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+## Storage Zones
+
+### Stash Registration
+
+The storage system integrates with ox_inventory for shop stashes:
+
+```lua
+-- Register storage stash for shop
+StorageZones.register({
+    shopId = 1,
+    stashId = 'mechanic_shop_1_storage',
+    label = 'Shop Storage',
+    coords = vector3(-340.0, -140.0, 39.0),
+    slots = 50,
+    weight = 100000,
+    allowedJobs = { 'mechanic' },
+})
+
+-- Creates ox_inventory stash
+exports.ox_inventory:RegisterStash(stashId, label, slots, weight)
+```
+
+### Access Control
+
+```lua
+-- Check stash access
+lib.callback.register('mechanic:storage:canAccess', function(source, stashId)
+    local storage = StorageZones.getByStashId(stashId)
+    if not storage then return false end
+
+    -- Check job
+    local player = Framework.GetPlayer(source)
+    local playerJob = player.Job.Name
+
+    return table.contains(storage.allowedJobs, playerJob)
+end)
+```
+
+## Shop Zones
+
+### Ped Configuration
+
+```lua
+-- Register shop ped zone
+ShopZones.register({
+    shopId = 1,
+    pedModel = 's_m_m_autoshop_02',
+    coords = vector4(-336.0, -134.0, 39.0, 180.0),
+    scenario = 'WORLD_HUMAN_CLIPBOARD',
+    interactionDistance = 2.0,
+    blip = {
+        sprite = 446,
+        color = 0,
+        label = 'Mechanic Shop',
+    },
+})
+```
+
+### Ped Interactions
+
+```lua
+-- Handle ped interaction
+lib.callback.register('mechanic:shop:interact', function(source, shopId)
+    local shop = ShopZones.getShop(shopId)
+    if not shop then return { success = false } end
+
+    -- Return shop menu options based on player job/grade
+    local player = Framework.GetPlayer(source)
+    local options = ShopZones.getMenuOptions(player, shop)
+
+    return {
+        success = true,
+        shop = shop,
+        options = options,
+    }
+end)
+```
+
+## Repair Zones
+
+### Zone Configuration
+
+```lua
+-- Register repair zone
+RepairZones.register({
+    shopId = 1,
+    zoneId = 'shop_1_repair',
+    coords = vector3(-342.0, -138.0, 39.0),
+    radius = 4.0,
+    repairTypes = { 'body', 'engine', 'wheels' },
+    prices = {
+        body = 500,
+        engine = 1000,
+        wheels = 300,
+    },
+})
+```
+
+### Repair Callbacks
+
+```lua
+-- Process repair request
+lib.callback.register('mechanic:repair:process', function(source, data)
+    local zone = RepairZones.get(data.zoneId)
+    if not zone then return { success = false } end
+
+    -- Validate repair type
+    if not table.contains(zone.repairTypes, data.repairType) then
+        return { success = false, error = 'Invalid repair type' }
+    end
+
+    -- Get price
+    local price = zone.prices[data.repairType]
+
+    -- Check player funds
+    local player = Framework.GetPlayer(source)
+    if player.GetMoney('cash') < price then
+        return { success = false, error = 'Insufficient funds' }
+    end
+
+    -- Process payment
+    player.RemoveMoney('cash', price, 'Vehicle repair')
+
+    return {
+        success = true,
+        repairType = data.repairType,
+        price = price,
+    }
+end)
+```
+
+## Repair Ped Zones (NPC Auto-Repair)
+
+### Configuration
+
+The repair ped system allows NPCs to perform automatic repairs:
+
+```lua
+MechanicConfig.RepairPeds = {
+    Enabled = true,
+    Peds = {
+        {
+            model = 's_m_m_autoshop_02',
+            coords = vector4(-342.0, -138.0, 39.0, 90.0),
+            blip = {
+                sprite = 446,
+                color = 0,
+                label = 'Auto Repair',
+            },
+            prices = {
+                full = 2000,
+                body = 500,
+                engine = 1000,
+            },
+            repairTime = 5000, -- ms
+        },
+    },
+}
+```
+
+### NPC Repair Processing
+
+```lua
+-- Handle NPC repair request
+lib.callback.register('mechanic:repairPed:repair', function(source, data)
+    local ped = RepairPedZones.getPed(data.pedId)
+    if not ped then return { success = false } end
+
+    local price = ped.prices[data.repairType]
+    local player = Framework.GetPlayer(source)
+
+    if player.GetMoney('cash') < price then
+        return { success = false, error = 'Insufficient funds' }
+    end
+
+    player.RemoveMoney('cash', price, 'NPC vehicle repair')
+
+    -- Trigger client-side repair
+    return {
+        success = true,
+        repairType = data.repairType,
+        repairTime = ped.repairTime,
+    }
+end)
+```
+
+## Zone Admin Callbacks
+
+### Creating Zones
+
+```lua
+-- Admin: Create new zone
+lib.callback.register('mechanic:admin:createZone', function(source, data)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    local zoneId = MySQL.insert.await([[
+        INSERT INTO ds_mechanic_zones (zone_type, shop_id, name, coords, radius, settings)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ]], {
+        data.zoneType,
+        data.shopId,
+        data.name,
+        json.encode(data.coords),
+        data.radius,
+        json.encode(data.settings or {}),
+    })
+
+    -- Refresh zone cache
+    ZoneManager.refreshCache()
+
+    return { success = true, zoneId = zoneId }
+end)
+```
+
+### Updating Zones
+
+```lua
+-- Admin: Update zone
+lib.callback.register('mechanic:admin:updateZone', function(source, data)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    MySQL.update.await([[
+        UPDATE ds_mechanic_zones
+        SET name = ?, coords = ?, radius = ?, settings = ?
+        WHERE id = ?
+    ]], {
+        data.name,
+        json.encode(data.coords),
+        data.radius,
+        json.encode(data.settings),
+        data.zoneId,
+    })
+
+    ZoneManager.refreshCache()
+
+    return { success = true }
+end)
+```
+
+### Deleting Zones
+
+```lua
+-- Admin: Delete zone
+lib.callback.register('mechanic:admin:deleteZone', function(source, data)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    MySQL.update.await([[
+        UPDATE ds_mechanic_zones SET is_active = 0 WHERE id = ?
+    ]], { data.zoneId })
+
+    ZoneManager.refreshCache()
+
+    return { success = true }
+end)
+```
+
+## Zone Events
+
+```lua
+-- Triggered when player enters zone
+TriggerEvent('mechanic:zone:entered', {
+    source = source,
+    zoneId = zoneId,
+    zoneType = zoneType,
+})
+
+-- Triggered when player exits zone
+TriggerEvent('mechanic:zone:exited', {
+    source = source,
+    zoneId = zoneId,
+    zoneType = zoneType,
+})
+```
+
+## Best Practices
+
+1. **Cache zone data** - Load zones once and refresh on changes
+2. **Validate zone access** - Always check job/grade permissions
+3. **Use soft deletes** - Mark zones inactive instead of deleting
+4. **Sync zone changes** - Notify all clients when zones update
+5. **Log zone activity** - Track zone entry/exit for analytics

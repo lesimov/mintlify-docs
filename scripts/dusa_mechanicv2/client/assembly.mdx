@@ -1,0 +1,409 @@
+---
+title: "Assembly System (Client)"
+description: "Client-side assembly interface with skill checks, animations, and progress tracking"
+---
+
+# Client Assembly System
+
+The client assembly system provides the user interface and interaction for the hybrid assembly workflow, including skill check mini-games and progress visualization.
+
+## Overview
+
+The client assembly module includes:
+
+1. **Assembly UI** - Task list and progress display
+2. **Skill Checks** - Mini-game challenges
+3. **Animations** - Mechanic work animations
+4. **Props** - Tool and part prop management
+
+## Assembly Workflow
+
+### Starting Assembly
+
+```lua
+-- NUI callback to start assembly
+RegisterNUICallback('mechanic:assembly:start', function(data, cb)
+    local vehicle = cache.vehicle or GetVehiclePedIsIn(cache.ped, false)
+
+    if not vehicle then
+        cb({ success = false, error = 'No vehicle' })
+        return
+    end
+
+    -- Request assembly from server
+    local result = lib.callback.await('mechanic:assembly:start', false, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        tasks = data.selectedTasks,
+    })
+
+    if result.success then
+        AssemblyState.current = {
+            assemblyId = result.assemblyId,
+            vehicle = vehicle,
+            tasks = result.tasks,
+            currentTask = nil,
+        }
+
+        -- Update UI
+        SendNUIMessage({
+            type = 'ASSEMBLY_STARTED',
+            payload = result,
+        })
+    end
+
+    cb(result)
+end)
+```
+
+### Task Execution
+
+```lua
+-- Start a specific task
+RegisterNUICallback('mechanic:assembly:startTask', function(data, cb)
+    if not AssemblyState.current then
+        cb({ success = false })
+        return
+    end
+
+    local result = lib.callback.await('mechanic:assembly:startTask', false, {
+        assemblyId = AssemblyState.current.assemblyId,
+        taskId = data.taskId,
+    })
+
+    if result.success then
+        AssemblyState.current.currentTask = data.taskId
+
+        -- Start task sequence
+        AssemblyClient.executeTask(result)
+    end
+
+    cb(result)
+end)
+
+-- Execute task with animations and skill checks
+function AssemblyClient.executeTask(taskData)
+    CreateThread(function()
+        -- Position player
+        local vehicle = AssemblyState.current.vehicle
+        local taskCoords = AssemblyClient.getTaskPosition(vehicle, taskData.taskId)
+
+        TaskGoStraightToCoord(cache.ped, taskCoords.x, taskCoords.y, taskCoords.z, 1.0, -1, taskCoords.w, 0.0)
+        Wait(2000)
+
+        -- Spawn props
+        AssemblyProps.spawn(taskData.props)
+
+        -- Start animation
+        AssemblyClient.playAnimation(taskData.animation)
+
+        -- Execute skill checks
+        for i, skillCheck in ipairs(taskData.skillChecks) do
+            local passed = AssemblyClient.doSkillCheck(skillCheck)
+
+            -- Report result to server
+            TriggerServerEvent('mechanic:assembly:skillCheckResult', {
+                assemblyId = AssemblyState.current.assemblyId,
+                taskId = taskData.taskId,
+                checkIndex = i,
+                success = passed,
+            })
+
+            if not passed then
+                -- Show failure feedback
+                Framework.Notify(locale('skill_check_failed'), 'error')
+            end
+
+            Wait(500) -- Delay between checks
+        end
+
+        -- Progress bar
+        local completed = lib.progressBar({
+            duration = taskData.duration,
+            label = taskData.label,
+            useWhileDead = false,
+            canCancel = true,
+            disable = {
+                move = true,
+                car = true,
+                combat = true,
+            },
+        })
+
+        -- Cleanup
+        AssemblyProps.despawn()
+        ClearPedTasks(cache.ped)
+
+        -- Complete task
+        if completed then
+            local completeResult = lib.callback.await('mechanic:assembly:completeTask', false, {
+                assemblyId = AssemblyState.current.assemblyId,
+                taskId = taskData.taskId,
+            })
+
+            SendNUIMessage({
+                type = 'TASK_COMPLETED',
+                payload = completeResult,
+            })
+
+            if completeResult.assemblyComplete then
+                AssemblyClient.finish()
+            end
+        else
+            -- Cancelled
+            SendNUIMessage({
+                type = 'TASK_CANCELLED',
+                payload = { taskId = taskData.taskId },
+            })
+        end
+    end)
+end
+```
+
+## Skill Check System
+
+### Circle Skill Check
+
+```lua
+-- ox_lib skill check
+function AssemblyClient.doSkillCheck(config)
+    if config.type == 'circle' then
+        return lib.skillCheck(
+            config.segments or { 'easy', 'medium' },
+            config.keys or { 'w', 'a', 's', 'd' }
+        )
+    elseif config.type == 'keys' then
+        return AssemblyClient.doKeySequence(config)
+    end
+
+    return true
+end
+```
+
+### Key Sequence Check
+
+```lua
+-- Custom key sequence skill check
+function AssemblyClient.doKeySequence(config)
+    local keys = config.keys or { 'W', 'A', 'S', 'D' }
+    local timeout = config.timeout or 5000
+    local sequence = {}
+
+    -- Generate random sequence
+    for i = 1, config.length or 5 do
+        sequence[i] = keys[math.random(#keys)]
+    end
+
+    -- Display sequence
+    SendNUIMessage({
+        type = 'SKILL_CHECK_KEYS',
+        payload = {
+            sequence = sequence,
+            timeout = timeout,
+        },
+    })
+
+    -- Wait for result
+    local result = promise.new()
+
+    RegisterNUICallback('mechanic:skillCheck:result', function(data, cb)
+        result:resolve(data.success)
+        cb({ received = true })
+    end)
+
+    return Citizen.Await(result)
+end
+```
+
+## Animation System
+
+### Playing Work Animations
+
+```lua
+-- Play assembly animation
+function AssemblyClient.playAnimation(animConfig)
+    lib.requestAnimDict(animConfig.dict)
+
+    TaskPlayAnim(
+        cache.ped,
+        animConfig.dict,
+        animConfig.anim,
+        8.0, 8.0, -1,
+        animConfig.flags or 1,
+        0.0, false, false, false
+    )
+end
+
+-- Animation presets
+AssemblyAnimations = {
+    wrench = {
+        dict = 'mini@repair',
+        anim = 'fixing_a_ped',
+        flags = 49,
+    },
+    spray = {
+        dict = 'move_weapon@spray',
+        anim = 'idle',
+        flags = 49,
+    },
+    crouch = {
+        dict = 'amb@world_human_vehicle_mechanic@male@base',
+        anim = 'base',
+        flags = 1,
+    },
+    stand = {
+        dict = 'mini@repair',
+        anim = 'fixing_a_player',
+        flags = 49,
+    },
+}
+```
+
+## Prop Management
+
+### Spawning Task Props
+
+```lua
+AssemblyProps = {
+    spawned = {},
+}
+
+-- Spawn props for task
+function AssemblyProps.spawn(propConfigs)
+    for _, config in ipairs(propConfigs) do
+        lib.requestModel(config.model)
+
+        local prop = CreateObject(
+            GetHashKey(config.model),
+            0.0, 0.0, 0.0,
+            true, true, false
+        )
+
+        -- Attach to player bone
+        if config.bone then
+            AttachEntityToEntity(
+                prop,
+                cache.ped,
+                GetPedBoneIndex(cache.ped, config.bone),
+                config.offset.x or 0.0,
+                config.offset.y or 0.0,
+                config.offset.z or 0.0,
+                config.rotation.x or 0.0,
+                config.rotation.y or 0.0,
+                config.rotation.z or 0.0,
+                true, true, false, true, 1, true
+            )
+        end
+
+        table.insert(AssemblyProps.spawned, prop)
+    end
+end
+
+-- Despawn all props
+function AssemblyProps.despawn()
+    for _, prop in ipairs(AssemblyProps.spawned) do
+        if DoesEntityExist(prop) then
+            DeleteEntity(prop)
+        end
+    end
+
+    AssemblyProps.spawned = {}
+end
+```
+
+## Progress Tracking
+
+### UI Updates
+
+```lua
+-- Get assembly progress
+RegisterNUICallback('mechanic:assembly:getProgress', function(data, cb)
+    if not AssemblyState.current then
+        cb({ success = false })
+        return
+    end
+
+    local result = lib.callback.await('mechanic:assembly:getProgress', false, {
+        assemblyId = AssemblyState.current.assemblyId,
+    })
+
+    cb(result)
+end)
+
+-- Update progress display
+function AssemblyClient.updateProgress(progress)
+    SendNUIMessage({
+        type = 'ASSEMBLY_PROGRESS',
+        payload = progress,
+    })
+end
+```
+
+## Customer Vehicle Integration
+
+### Vehicle State During Assembly
+
+```lua
+-- Listen for assembly start (customer perspective)
+RegisterNetEvent('mechanic:assembly:vehicleHidden', function(plate)
+    -- Vehicle is now with mechanic
+    Framework.Notify(locale('vehicle_in_assembly'), 'info')
+end)
+
+-- Listen for assembly complete
+RegisterNetEvent('mechanic:assembly:completed', function(data)
+    Framework.Notify(locale('assembly_complete', { plate = data.plate }), 'success')
+
+    -- Show pickup location
+    SetNewWaypoint(data.pickupCoords.x, data.pickupCoords.y)
+end)
+```
+
+### Pending Mods Hook
+
+```lua
+-- Hook for garages to apply pending mods
+RegisterNetEvent('mechanic:assembly:applyPendingMods', function(vehicle, plate)
+    -- Check for pending mods
+    local hasPending = exports.dusa_mechanicv2:HasPendingMods(plate)
+
+    if hasPending then
+        -- Apply mods from assembly
+        exports.dusa_mechanicv2:ApplyPendingMods(vehicle, plate)
+    end
+end)
+```
+
+## Finishing Assembly
+
+```lua
+-- Clean up assembly session
+function AssemblyClient.finish()
+    if not AssemblyState.current then return end
+
+    -- Clean up
+    AssemblyProps.despawn()
+    ClearPedTasks(cache.ped)
+
+    -- Notify UI
+    SendNUIMessage({
+        type = 'ASSEMBLY_COMPLETE',
+        payload = {
+            assemblyId = AssemblyState.current.assemblyId,
+        },
+    })
+
+    -- Reset state
+    AssemblyState.current = nil
+end
+
+-- Cancel assembly
+function AssemblyClient.cancel()
+    if not AssemblyState.current then return end
+
+    lib.callback.await('mechanic:assembly:cancel', false, {
+        assemblyId = AssemblyState.current.assemblyId,
+    })
+
+    AssemblyClient.finish()
+end
+```

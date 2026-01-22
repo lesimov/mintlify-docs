@@ -1,0 +1,180 @@
+---
+title: "Debug & Logging System"
+description: "Server-side debug logging, telemetry, and HTTP API for external debugging"
+---
+
+# Debug & Logging System
+
+Dusa Mechanic includes a comprehensive debug and logging system that helps developers track issues, monitor performance, and debug problems in real-time.
+
+## Overview
+
+The debug system consists of three main components:
+
+1. **MechanicLogger** - Main logging interface with levels and categories
+2. **MechanicTelemetry** - Performance tracking and metrics collection
+3. **HTTP API** - External debug viewer access
+
+## Configuration
+
+Enable debugging in `shared/config.lua`:
+
+```lua
+MechanicConfig.Debug = {
+    Enabled = true,           -- Master debug toggle
+    Level = 'debug',          -- 'error', 'warn', 'info', 'debug'
+    Categories = {            -- Enable/disable specific categories
+        TABLET = true,
+        TUNING = true,
+        DATABASE = true,
+        ADMIN = true,
+        ZONES = true,
+    },
+    ShowTimestamps = true,
+    ShowSource = true,
+}
+```
+
+## MechanicLogger API
+
+### Log Levels
+
+```lua
+-- Error - Critical issues that need immediate attention
+MechanicLogger.error('CATEGORY', 'Database connection failed', { error = err })
+
+-- Warning - Potential issues that should be monitored
+MechanicLogger.warn('TUNING', 'Price calculation fallback used', { vehicleModel = model })
+
+-- Info - General information about system operations
+MechanicLogger.info('TABLET', 'Order created successfully', { orderId = 123 })
+
+-- Debug - Detailed information for debugging
+MechanicLogger.debug('ZONES', 'Player entered tuning zone', { playerId = source, zoneId = 5 })
+```
+
+### Performance Tracking
+
+```lua
+-- Start a timer for an operation
+MechanicLogger.startTimer('database_query')
+
+-- Perform the operation
+local result = MySQL.query.await('SELECT * FROM ds_mechanic_shops')
+
+-- End timer and log duration
+local duration = MechanicLogger.endTimer('database_query', 'DATABASE')
+-- Output: [DATABASE] database_query completed in 45ms
+```
+
+### Session Tracking
+
+```lua
+-- Log with session context
+MechanicLogger.withSession(sessionId, function()
+    MechanicLogger.info('TABLET', 'Processing order', { orderId = id })
+end)
+```
+
+## Telemetry System
+
+The telemetry system tracks performance metrics and can send data to external monitoring services.
+
+### Configuration
+
+```lua
+MechanicConfig.Telemetry = {
+    Enabled = false,              -- Enable telemetry collection
+    Endpoint = '',                -- External endpoint URL
+    FlushInterval = 60000,        -- Flush interval in ms
+    BatchSize = 100,              -- Max events per batch
+    IncludePlayerData = false,    -- Include player identifiers
+}
+```
+
+### Usage
+
+```lua
+-- Track a custom event
+MechanicTelemetry.track('order_completed', {
+    orderId = order.id,
+    totalPrice = order.total,
+    itemCount = #order.items,
+})
+
+-- Track timing
+MechanicTelemetry.timing('tuning_apply', duration)
+
+-- Track errors
+MechanicTelemetry.error('payment_failed', { reason = 'insufficient_funds' })
+```
+
+## HTTP Debug API
+
+The HTTP API allows external tools to access debug information.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/debug/logs` | GET | Retrieve recent log entries |
+| `/debug/metrics` | GET | Get current metrics |
+| `/debug/sessions` | GET | List active debug sessions |
+| `/debug/clear` | POST | Clear log buffer |
+
+### Configuration
+
+```lua
+MechanicConfig.Debug.HTTP = {
+    Enabled = false,              -- Enable HTTP API
+    Port = 30120,                 -- HTTP port (uses FiveM's port)
+    Path = '/mechanic/debug',     -- API base path
+    AuthToken = '',               -- Required auth token
+}
+```
+
+### Example Request
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+     http://localhost:30120/mechanic/debug/logs?limit=100&category=TUNING
+```
+
+## Debug Categories
+
+| Category | Description |
+|----------|-------------|
+| `TABLET` | Tablet UI and API operations |
+| `TUNING` | Vehicle tuning and modifications |
+| `DATABASE` | Database queries and migrations |
+| `ADMIN` | Admin commands and operations |
+| `ZONES` | Zone entry/exit and interactions |
+| `ASSEMBLY` | Assembly system operations |
+| `CRAFT` | Crafting system |
+| `LIFTS` | Lift control system |
+| `STANCE` | Stance/suspension system |
+| `ITEMS` | Item usage (kits, remotes) |
+
+## Best Practices
+
+1. **Use appropriate log levels** - Don't use `error` for non-critical issues
+2. **Include context** - Always pass relevant data in the context object
+3. **Use categories** - Enable only needed categories in production
+4. **Clean up debug code** - Remove or disable debug logs before release
+5. **Protect sensitive data** - Don't log player credentials or payment info
+
+## Exports
+
+```lua
+-- Get current debug level
+exports.dusa_mechanicv2:getDebugLevel()
+
+-- Set debug level at runtime
+exports.dusa_mechanicv2:setDebugLevel('info')
+
+-- Get enabled categories
+exports.dusa_mechanicv2:getDebugCategories()
+
+-- Get logger instance
+local logger = exports.dusa_mechanicv2:getLogger()
+```

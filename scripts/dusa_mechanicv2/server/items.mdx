@@ -1,0 +1,437 @@
+---
+title: "Items System"
+description: "Server-side item usage handlers for vehicle kits and remote controllers"
+---
+
+# Items System
+
+The items system handles usable items including vehicle repair/cleaning kits and remote controllers for lifts and stance.
+
+## Overview
+
+The items system consists of two main components:
+
+1. **Vehicle Kits** - Repair kits, cleaning kits, and maintenance items
+2. **Remote Controllers** - Lift remotes and stance remotes
+
+## Vehicle Kits
+
+### Repair Kit
+
+```lua
+-- Register repair kit item
+exports.ox_inventory:RegisterUsableItem('repair_kit', function(source, slot)
+    local item = exports.ox_inventory:GetSlot(source, slot)
+    if not item then return end
+
+    -- Check if player is near a vehicle
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+    local vehicle = lib.getClosestVehicle(coords, 3.0)
+
+    if not vehicle then
+        Framework.Notify(source, 'No vehicle nearby', 'error')
+        return
+    end
+
+    -- Get vehicle damage
+    local bodyHealth = GetVehicleBodyHealth(vehicle)
+    local engineHealth = GetVehicleEngineHealth(vehicle)
+
+    -- Determine repair type based on damage
+    local repairType = nil
+    if engineHealth < 1000 then
+        repairType = 'engine'
+    elseif bodyHealth < 1000 then
+        repairType = 'body'
+    else
+        Framework.Notify(source, 'Vehicle does not need repair', 'info')
+        return
+    end
+
+    -- Start repair (client-side progress)
+    TriggerClientEvent('mechanic:items:startRepair', source, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        repairType = repairType,
+        duration = MechanicConfig.Items.RepairKit.Duration,
+        slot = slot,
+    })
+end)
+
+-- Complete repair callback
+lib.callback.register('mechanic:items:completeRepair', function(source, data)
+    -- Verify item still exists
+    local item = exports.ox_inventory:GetSlot(source, data.slot)
+    if not item or item.name ~= 'repair_kit' then
+        return { success = false }
+    end
+
+    -- Remove item
+    exports.ox_inventory:RemoveItem(source, 'repair_kit', 1, nil, data.slot)
+
+    -- Apply repair server-side
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if DoesEntityExist(vehicle) then
+        if data.repairType == 'engine' then
+            SetVehicleEngineHealth(vehicle, 1000.0)
+        else
+            SetVehicleBodyHealth(vehicle, 1000.0)
+        end
+
+        -- Sync to all clients
+        TriggerClientEvent('mechanic:items:repairComplete', -1, {
+            vehicleNetId = data.vehicleNetId,
+            repairType = data.repairType,
+        })
+    end
+
+    return { success = true }
+end)
+```
+
+### Cleaning Kit
+
+```lua
+-- Register cleaning kit item
+exports.ox_inventory:RegisterUsableItem('cleaning_kit', function(source, slot)
+    local item = exports.ox_inventory:GetSlot(source, slot)
+    if not item then return end
+
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+    local vehicle = lib.getClosestVehicle(coords, 3.0)
+
+    if not vehicle then
+        Framework.Notify(source, 'No vehicle nearby', 'error')
+        return
+    end
+
+    -- Get dirt level
+    local dirtLevel = GetVehicleDirtLevel(vehicle)
+    if dirtLevel < 1.0 then
+        Framework.Notify(source, 'Vehicle is already clean', 'info')
+        return
+    end
+
+    -- Start cleaning
+    TriggerClientEvent('mechanic:items:startCleaning', source, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        duration = MechanicConfig.Items.CleaningKit.Duration,
+        slot = slot,
+    })
+end)
+
+-- Complete cleaning
+lib.callback.register('mechanic:items:completeCleaning', function(source, data)
+    local item = exports.ox_inventory:GetSlot(source, data.slot)
+    if not item or item.name ~= 'cleaning_kit' then
+        return { success = false }
+    end
+
+    -- Check uses remaining
+    local uses = item.metadata.uses or MechanicConfig.Items.CleaningKit.Uses
+    uses = uses - 1
+
+    if uses <= 0 then
+        -- Remove item
+        exports.ox_inventory:RemoveItem(source, 'cleaning_kit', 1, nil, data.slot)
+    else
+        -- Update uses
+        exports.ox_inventory:SetMetadata(source, data.slot, { uses = uses })
+    end
+
+    -- Apply cleaning
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if DoesEntityExist(vehicle) then
+        SetVehicleDirtLevel(vehicle, 0.0)
+
+        TriggerClientEvent('mechanic:items:cleaningComplete', -1, {
+            vehicleNetId = data.vehicleNetId,
+        })
+    end
+
+    return { success = true, usesRemaining = uses }
+end)
+```
+
+### Advanced Repair Kit
+
+```lua
+-- Advanced repair kit - repairs both body and engine
+exports.ox_inventory:RegisterUsableItem('advanced_repair_kit', function(source, slot)
+    local item = exports.ox_inventory:GetSlot(source, slot)
+    if not item then return end
+
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+    local vehicle = lib.getClosestVehicle(coords, 3.0)
+
+    if not vehicle then
+        Framework.Notify(source, 'No vehicle nearby', 'error')
+        return
+    end
+
+    TriggerClientEvent('mechanic:items:startAdvancedRepair', source, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        duration = MechanicConfig.Items.AdvancedRepairKit.Duration,
+        slot = slot,
+    })
+end)
+
+lib.callback.register('mechanic:items:completeAdvancedRepair', function(source, data)
+    local item = exports.ox_inventory:GetSlot(source, data.slot)
+    if not item or item.name ~= 'advanced_repair_kit' then
+        return { success = false }
+    end
+
+    exports.ox_inventory:RemoveItem(source, 'advanced_repair_kit', 1, nil, data.slot)
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if DoesEntityExist(vehicle) then
+        -- Full repair
+        SetVehicleEngineHealth(vehicle, 1000.0)
+        SetVehicleBodyHealth(vehicle, 1000.0)
+        SetVehiclePetrolTankHealth(vehicle, 1000.0)
+
+        -- Fix deformation
+        SetVehicleDeformationFixed(vehicle)
+
+        TriggerClientEvent('mechanic:items:advancedRepairComplete', -1, {
+            vehicleNetId = data.vehicleNetId,
+        })
+    end
+
+    return { success = true }
+end)
+```
+
+## Remote Controllers
+
+### Lift Remote
+
+```lua
+-- Register lift remote item
+exports.ox_inventory:RegisterUsableItem('lift_remote', function(source, slot)
+    local item = exports.ox_inventory:GetSlot(source, slot)
+    if not item then return end
+
+    -- Check if paired
+    local pairedLiftId = item.metadata.liftId
+    if not pairedLiftId then
+        Framework.Notify(source, 'Remote not paired to a lift', 'error')
+        return
+    end
+
+    -- Check if lift exists
+    local lift = LiftCache.get(pairedLiftId)
+    if not lift then
+        Framework.Notify(source, 'Paired lift not found', 'error')
+        return
+    end
+
+    -- Check distance to lift
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+    local liftCoords = vector3(lift.coords.x, lift.coords.y, lift.coords.z)
+    local distance = #(coords - liftCoords)
+
+    if distance > MechanicConfig.Items.LiftRemote.MaxDistance then
+        Framework.Notify(source, 'Too far from lift', 'error')
+        return
+    end
+
+    -- Open lift control UI
+    TriggerClientEvent('mechanic:items:openLiftControl', source, {
+        liftId = pairedLiftId,
+        lift = lift,
+    })
+end)
+
+-- Pair lift remote
+lib.callback.register('mechanic:items:pairLiftRemote', function(source, data)
+    local item = exports.ox_inventory:GetSlot(source, data.slot)
+    if not item or item.name ~= 'lift_remote' then
+        return { success = false }
+    end
+
+    -- Verify lift exists and player has access
+    local lift = LiftCache.get(data.liftId)
+    if not lift then
+        return { success = false, error = 'Lift not found' }
+    end
+
+    -- Check shop permission
+    if not TabletPermissions.canAccessShop(source, lift.shop_id) then
+        return { success = false, error = 'No access to this shop' }
+    end
+
+    -- Update metadata
+    exports.ox_inventory:SetMetadata(source, data.slot, {
+        liftId = data.liftId,
+        shopId = lift.shop_id,
+        pairedAt = os.time(),
+    })
+
+    return { success = true }
+end)
+
+-- Control lift
+lib.callback.register('mechanic:items:controlLift', function(source, data)
+    local lift = LiftCache.get(data.liftId)
+    if not lift then
+        return { success = false, error = 'Lift not found' }
+    end
+
+    -- Validate action
+    if not table.contains({'raise', 'lower', 'stop'}, data.action) then
+        return { success = false, error = 'Invalid action' }
+    end
+
+    -- Execute action
+    TriggerClientEvent('mechanic:lifts:control', -1, {
+        liftId = data.liftId,
+        action = data.action,
+    })
+
+    return { success = true }
+end)
+```
+
+### Stance Remote
+
+```lua
+-- Register stance remote item
+exports.ox_inventory:RegisterUsableItem('stance_remote', function(source, slot)
+    local item = exports.ox_inventory:GetSlot(source, slot)
+    if not item then return end
+
+    local pairedPlate = item.metadata.pairedPlate
+    if not pairedPlate then
+        -- Not paired - start pairing mode
+        TriggerClientEvent('mechanic:items:startStancePairing', source, {
+            slot = slot,
+        })
+        return
+    end
+
+    -- Check if vehicle is nearby
+    local vehicle = RemoteControllers.findVehicleByPlate(pairedPlate)
+    if not vehicle then
+        Framework.Notify(source, 'Paired vehicle not nearby', 'error')
+        return
+    end
+
+    -- Check distance
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+    local vehicleCoords = GetEntityCoords(vehicle)
+    local distance = #(coords - vehicleCoords)
+
+    if distance > MechanicConfig.Items.StanceRemote.MaxDistance then
+        Framework.Notify(source, 'Too far from vehicle', 'error')
+        return
+    end
+
+    -- Load stance data
+    local stanceData = StanceDatabase.load(pairedPlate)
+
+    -- Open stance control UI
+    TriggerClientEvent('mechanic:items:openStanceControl', source, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        stanceData = stanceData,
+        presets = stanceData and stanceData.presets or {},
+    })
+end)
+
+-- Helper function to find vehicle by plate
+function RemoteControllers.findVehicleByPlate(plate)
+    local vehicles = GetAllVehicles()
+
+    for _, vehicle in ipairs(vehicles) do
+        local vehPlate = GetVehicleNumberPlateText(vehicle)
+        if vehPlate and string.trim(vehPlate) == string.trim(plate) then
+            return vehicle
+        end
+    end
+
+    return nil
+end
+```
+
+## Item Definitions
+
+Add these to your inventory item definitions:
+
+```lua
+-- ox_inventory item definitions
+['repair_kit'] = {
+    label = 'Repair Kit',
+    weight = 500,
+    stack = true,
+    close = true,
+    description = 'Basic vehicle repair kit',
+},
+
+['advanced_repair_kit'] = {
+    label = 'Advanced Repair Kit',
+    weight = 1000,
+    stack = true,
+    close = true,
+    description = 'Full vehicle repair kit',
+},
+
+['cleaning_kit'] = {
+    label = 'Cleaning Kit',
+    weight = 300,
+    stack = false,
+    close = true,
+    description = 'Vehicle cleaning kit (5 uses)',
+},
+
+['lift_remote'] = {
+    label = 'Lift Remote',
+    weight = 100,
+    stack = false,
+    close = false,
+    description = 'Remote control for hydraulic lifts',
+},
+
+['stance_remote'] = {
+    label = 'Stance Remote',
+    weight = 100,
+    stack = false,
+    close = false,
+    description = 'Remote control for vehicle stance',
+},
+```
+
+## Configuration
+
+```lua
+MechanicConfig.Items = {
+    RepairKit = {
+        Duration = 10000,         -- Repair time in ms
+        Animation = {
+            dict = 'mini@repair',
+            anim = 'fixing_a_ped',
+        },
+    },
+
+    AdvancedRepairKit = {
+        Duration = 15000,
+    },
+
+    CleaningKit = {
+        Duration = 8000,
+        Uses = 5,                 -- Uses per kit
+    },
+
+    LiftRemote = {
+        MaxDistance = 20.0,       -- Max control distance
+    },
+
+    StanceRemote = {
+        MaxDistance = 15.0,
+    },
+}
+```

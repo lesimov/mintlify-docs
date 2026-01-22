@@ -1,0 +1,362 @@
+---
+title: "Assembly System"
+description: "Server-side hybrid assembly system for complex vehicle modifications with skill checks"
+---
+
+# Assembly System
+
+The assembly system provides a task-based approach to complex vehicle modifications, requiring multiple steps and skill checks to complete.
+
+## Overview
+
+The assembly system consists of two main components:
+
+1. **Vehicle Visibility** - Customer vehicle visibility during assembly
+2. **Main Assembly** - Task management and progress tracking
+
+## How Assembly Works
+
+Unlike instant tuning, assembly requires:
+
+1. Customer drops off vehicle
+2. Mechanic performs multiple assembly tasks
+3. Each task has skill checks and time requirements
+4. Vehicle is returned when all tasks complete
+
+## Vehicle Visibility
+
+### Hiding Customer Vehicles
+
+```lua
+-- When assembly starts, hide vehicle from customer
+lib.callback.register('mechanic:assembly:start', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    -- Store original owner
+    AssemblyVisibility.setVehicleInAssembly(plate, {
+        ownerId = data.customerId,
+        mechanicId = source,
+        shopId = data.shopId,
+        startedAt = os.time(),
+    })
+
+    -- Hide from customer's garage list
+    TriggerEvent('mechanic:assembly:vehicleHidden', plate, data.customerId)
+
+    return { success = true }
+end)
+```
+
+### Checking Assembly Status
+
+```lua
+-- Export for garage integration
+exports('IsVehicleInAssembly', function(plate)
+    return AssemblyVisibility.isInAssembly(plate)
+end)
+
+-- Get assembly details
+exports('GetVehicleOrderStatus', function(plate)
+    local assembly = AssemblyVisibility.get(plate)
+    if not assembly then return nil end
+
+    return {
+        inAssembly = true,
+        shopId = assembly.shopId,
+        startedAt = assembly.startedAt,
+        estimatedCompletion = assembly.estimatedCompletion,
+    }
+end)
+```
+
+## Assembly Tasks
+
+### Task Definition
+
+```lua
+-- Assembly task structure
+local task = {
+    id = 'engine_swap',
+    label = 'Engine Swap',
+    description = 'Replace the engine with a performance variant',
+    duration = 30000,        -- Base duration in ms
+    skillChecks = {
+        { type = 'circle', difficulty = 'medium' },
+        { type = 'circle', difficulty = 'hard' },
+    },
+    requiredItems = {
+        { item = 'engine_v8', count = 1 },
+        { item = 'engineoil', count = 2 },
+    },
+    animation = {
+        dict = 'mini@repair',
+        anim = 'fixing_a_player',
+    },
+    props = {
+        { model = 'prop_tool_wrench', bone = 'BONETAG_R_FINGER01' },
+    },
+}
+```
+
+### Starting Assembly Task
+
+```lua
+lib.callback.register('mechanic:assembly:startTask', function(source, data)
+    local assembly = AssemblyMain.get(data.assemblyId)
+    if not assembly then
+        return { success = false, error = 'Assembly not found' }
+    end
+
+    local task = AssemblyMain.getTask(data.taskId)
+    if not task then
+        return { success = false, error = 'Invalid task' }
+    end
+
+    -- Check required items
+    for _, item in ipairs(task.requiredItems) do
+        if not Framework.HasItem(source, item.item, item.count) then
+            return { success = false, error = 'Missing: ' .. item.item }
+        end
+    end
+
+    -- Remove items
+    for _, item in ipairs(task.requiredItems) do
+        Framework.RemoveItem(source, item.item, item.count)
+    end
+
+    -- Start task
+    AssemblyMain.startTask(data.assemblyId, data.taskId, source)
+
+    return {
+        success = true,
+        duration = task.duration,
+        skillChecks = task.skillChecks,
+        animation = task.animation,
+        props = task.props,
+    }
+end)
+```
+
+### Completing Assembly Task
+
+```lua
+lib.callback.register('mechanic:assembly:completeTask', function(source, data)
+    local assembly = AssemblyMain.get(data.assemblyId)
+    if not assembly then return { success = false } end
+
+    -- Verify skill checks passed
+    if data.skillChecksFailed > 0 then
+        -- Partial failure - extend time or reduce quality
+        AssemblyMain.recordPartialFailure(data.assemblyId, data.taskId, {
+            failedChecks = data.skillChecksFailed,
+        })
+    end
+
+    -- Complete task
+    AssemblyMain.completeTask(data.assemblyId, data.taskId)
+
+    -- Check if all tasks complete
+    local remaining = AssemblyMain.getRemainingTasks(data.assemblyId)
+    if #remaining == 0 then
+        -- Assembly complete
+        AssemblyMain.complete(data.assemblyId)
+        return { success = true, assemblyComplete = true }
+    end
+
+    return {
+        success = true,
+        assemblyComplete = false,
+        remainingTasks = remaining,
+    }
+end)
+```
+
+## Assembly Progress
+
+### Progress Tracking
+
+```lua
+-- Get assembly progress
+lib.callback.register('mechanic:assembly:getProgress', function(source, data)
+    local assembly = AssemblyMain.get(data.assemblyId)
+    if not assembly then return { success = false } end
+
+    local tasks = AssemblyMain.getTasks(data.assemblyId)
+    local completed = 0
+    local total = #tasks
+
+    for _, task in ipairs(tasks) do
+        if task.status == 'completed' then
+            completed = completed + 1
+        end
+    end
+
+    return {
+        success = true,
+        progress = {
+            completed = completed,
+            total = total,
+            percentage = (completed / total) * 100,
+            currentTask = AssemblyMain.getCurrentTask(data.assemblyId),
+            estimatedTimeRemaining = AssemblyMain.getEstimatedTime(data.assemblyId),
+        },
+    }
+end)
+```
+
+### Assembly Completion
+
+```lua
+-- Complete assembly and return vehicle
+function AssemblyMain.complete(assemblyId)
+    local assembly = AssemblyMain.get(assemblyId)
+
+    -- Apply all modifications to vehicle
+    local vehicle = NetworkGetEntityFromNetworkId(assembly.vehicleNetId)
+    for _, mod in ipairs(assembly.modifications) do
+        SetVehicleMod(vehicle, mod.type, mod.index, false)
+    end
+
+    -- Save to database
+    VehicleProps.save(assembly.plate, GetVehicleProperties(vehicle))
+
+    -- Make vehicle visible to customer again
+    AssemblyVisibility.removeFromAssembly(assembly.plate)
+
+    -- Notify customer
+    local customerSource = Framework.GetPlayerByIdentifier(assembly.customerId)
+    if customerSource then
+        TriggerClientEvent('mechanic:assembly:completed', customerSource, {
+            plate = assembly.plate,
+            shopId = assembly.shopId,
+        })
+    end
+
+    -- Record in database
+    MySQL.insert.await([[
+        INSERT INTO ds_mechanic_service_history
+        (shop_id, customer_id, vehicle_plate, service_type, details, completed_at)
+        VALUES (?, ?, ?, 'assembly', ?, NOW())
+    ]], {
+        assembly.shopId,
+        assembly.customerId,
+        assembly.plate,
+        json.encode(assembly),
+    })
+
+    -- Clean up
+    AssemblyMain.remove(assemblyId)
+
+    TriggerEvent('mechanic:assembly:completed', assembly)
+end
+```
+
+## Skill Check Integration
+
+### Skill Check Types
+
+```lua
+-- Skill check configurations
+MechanicConfig.Assembly.SkillChecks = {
+    circle = {
+        easy = { duration = 10000, radius = 30, segments = 3 },
+        medium = { duration = 8000, radius = 25, segments = 4 },
+        hard = { duration = 6000, radius = 20, segments = 5 },
+    },
+    keys = {
+        easy = { keys = 4, timeout = 5000 },
+        medium = { keys = 5, timeout = 4000 },
+        hard = { keys = 6, timeout = 3000 },
+    },
+}
+```
+
+### Handling Skill Check Results
+
+```lua
+-- Process skill check result from client
+RegisterNetEvent('mechanic:assembly:skillCheckResult', function(data)
+    local source = source
+    local assembly = AssemblyMain.get(data.assemblyId)
+
+    if not assembly then return end
+
+    if data.success then
+        AssemblyMain.recordSkillCheckPass(data.assemblyId, data.taskId, data.checkIndex)
+    else
+        AssemblyMain.recordSkillCheckFail(data.assemblyId, data.taskId, data.checkIndex)
+
+        -- Penalize for failure
+        local task = AssemblyMain.getTask(data.taskId)
+        local penalty = task.failurePenalty or 0.1 -- 10% time penalty
+
+        AssemblyMain.extendTaskTime(data.assemblyId, data.taskId, penalty)
+    end
+end)
+```
+
+## Garage Integration Exports
+
+```lua
+-- Check if vehicle has pending assembly mods
+exports('HasPendingMods', function(plate)
+    local assembly = AssemblyMain.getByPlate(plate)
+    return assembly ~= nil and assembly.status ~= 'completed'
+end)
+
+-- Get pending mods for a vehicle
+exports('GetPendingMods', function(plate)
+    local assembly = AssemblyMain.getByPlate(plate)
+    if not assembly then return nil end
+
+    return assembly.pendingMods
+end)
+
+-- Apply pending mods when vehicle spawns
+exports('ApplyPendingMods', function(vehicle, plate)
+    local pendingMods = AssemblyMain.getPendingMods(plate)
+    if not pendingMods then return false end
+
+    for _, mod in ipairs(pendingMods) do
+        SetVehicleMod(vehicle, mod.type, mod.index, false)
+    end
+
+    AssemblyMain.clearPendingMods(plate)
+    return true
+end)
+```
+
+## Database Schema
+
+```sql
+CREATE TABLE ds_mechanic_assemblies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    customer_id VARCHAR(64) NOT NULL,
+    mechanic_id VARCHAR(64),
+    vehicle_plate VARCHAR(16) NOT NULL,
+    vehicle_model VARCHAR(32),
+    status ENUM('pending', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending',
+    tasks JSON,
+    modifications JSON,
+    started_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_shop_id (shop_id),
+    INDEX idx_status (status),
+    INDEX idx_plate (vehicle_plate),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+## Events
+
+```lua
+-- Assembly events
+TriggerEvent('mechanic:assembly:started', { assemblyId, plate, shopId })
+TriggerEvent('mechanic:assembly:taskStarted', { assemblyId, taskId })
+TriggerEvent('mechanic:assembly:taskCompleted', { assemblyId, taskId })
+TriggerEvent('mechanic:assembly:completed', { assemblyId, plate, modifications })
+TriggerEvent('mechanic:assembly:cancelled', { assemblyId, reason })
+```

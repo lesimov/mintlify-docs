@@ -1,0 +1,261 @@
+---
+title: "Codebase Map"
+description: "Complete file structure and module relationships for dusa_mechanicv2 FiveM resource"
+---
+
+# dusa_mechanicv2 Codebase Map
+
+This document provides AI assistants with a comprehensive map of the codebase structure, file purposes, and module relationships.
+
+## Resource Identity
+
+- **Resource Name**: dusa_mechanicv2
+- **Type**: FiveM mechanic/tuning system
+- **Framework**: Framework-agnostic (uses dusa_bridge)
+- **UI**: React/TypeScript NUI (in web/ folder, built to dist/)
+- **Database**: MySQL via oxmysql
+- **Dependencies**: ox_lib, dusa_bridge, dusa_tablet
+
+## Directory Structure
+
+```
+dusa_mechanicv2/
+├── client/                    # Client-side Lua scripts
+│   ├── admin/                 # Admin UI and tools
+│   ├── assembly/              # Assembly workflow client
+│   ├── craft/                 # Crafting system client
+│   ├── debug/                 # Debug tools and logging
+│   ├── items/                 # Item usage handlers
+│   ├── lifts/                 # Hydraulic lift system
+│   ├── locales/               # Client locale handlers
+│   ├── remotes/               # Remote controller systems
+│   ├── stance/                # Stance/camber controls
+│   ├── tuning/                # Tuning camera, preview, mods
+│   └── zones/                 # Zone detection and interaction
+├── server/                    # Server-side Lua scripts
+│   ├── admin/                 # Admin commands and management
+│   ├── api/                   # External API integrations
+│   ├── assembly/              # Assembly workflow server
+│   ├── craft/                 # Crafting system server
+│   ├── database/              # Database init and migrations
+│   ├── debug/                 # Logging and telemetry
+│   ├── items/                 # Item registration and usage
+│   ├── lifts/                 # Lift control callbacks
+│   ├── stance/                # Stance sync and persistence
+│   ├── tablet/                # Tablet API (permissions, callbacks)
+│   ├── tuning/                # Tuning logic and vehicle values
+│   └── zones/                 # Zone management server
+├── modules/                   # Self-contained feature modules
+│   ├── garage_integration/    # dusa_modulargarages integration
+│   └── illegal_network/       # Redline Network (darknet)
+├── shared/                    # Shared Lua configs (client+server)
+│   ├── config.lua             # Main configuration
+│   ├── config.mods.lua        # Vehicle mod definitions
+│   ├── config.tuning.lua      # Tuning prices and settings
+│   ├── config.assembly.lua    # Assembly task definitions
+│   ├── config.lifts.lua       # Lift configuration
+│   ├── config.repair.lua      # Repair zone settings
+│   ├── config.shop.lua        # Shop ped zone settings
+│   ├── config.vehicle_prices.lua # Vehicle price fallbacks
+│   ├── constants.lua          # Static enums and constants
+│   └── craft_constants.lua    # Craft system constants
+├── sql/                       # Database schema
+│   └── migrations/            # Numbered migration files
+├── config/                    # JSON configuration files
+│   ├── craft_recipes.json     # Crafting recipes
+│   ├── craft_zones.json       # Craft zone definitions
+│   └── illegal_tuning.json    # Illegal mod definitions
+├── web/                       # React/TypeScript UI source
+│   └── src/                   # UI components and hooks
+├── dist/                      # Built UI files (from web/)
+├── locales/                   # Language JSON files
+└── docs/                      # This documentation
+```
+
+## Critical Files Reference
+
+### Entry Points
+
+| File | Purpose | Side |
+|------|---------|------|
+| `fxmanifest.lua` | Resource manifest, load order | Both |
+| `client/tablet_integration.lua` | Main NUI callback handler | Client |
+| `server/tablet/callbacks.lua` | Server API endpoints | Server |
+| `server/database/init.lua` | Database connection | Server |
+
+### Global Modules (Escrow Pattern)
+
+These modules are available globally without require():
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `MechanicConfig` | shared/config.lua | Runtime configuration |
+| `MechanicConstants` | shared/constants.lua | Static enums |
+| `MechanicLogger` | server/debug/logging.lua | Server logging |
+| `ClientDebug` | client/debug/main.lua | Client logging |
+| `TabletPermissions` | server/tablet/permissions.lua | Permission checks |
+| `TabletValidation` | server/tablet/validation.lua | Input validation |
+| `TabletDatabase` | server/tablet/database.lua | Database queries |
+
+### Configuration Files
+
+| File | Content Type | Key Settings |
+|------|--------------|--------------|
+| `shared/config.lua` | Lua table | Debug, Database, Salary, JobSystem |
+| `shared/config.mods.lua` | Lua table | Vehicle mod types and categories |
+| `shared/config.tuning.lua` | Lua table | Tuning prices, dynamic pricing |
+| `shared/config.assembly.lua` | Lua table | Assembly tasks and skill checks |
+| `config/craft_recipes.json` | JSON | Crafting recipes |
+
+## Module Relationships
+
+### Data Flow: NUI → Server → Database
+
+```
+React UI (web/src/)
+    ↓ postNui('mechanic:action', data)
+client/tablet_integration.lua
+    ↓ RegisterNUICallback → lib.callback.await
+server/tablet/callbacks.lua
+    ↓ Permission check (TabletPermissions)
+    ↓ Validation (TabletValidation)
+    ↓ Query (TabletDatabase)
+Database (MySQL)
+    ↓ Result
+    ↑ Returns through callback chain
+```
+
+### Tuning System Flow
+
+```
+client/tuning/main.lua (entry)
+    ├── camera.lua (cinematic camera)
+    ├── preview.lua (mod preview)
+    ├── mods.lua (mod application)
+    ├── behaviors.lua (input handling)
+    └── parts.lua (parts menu)
+         ↓
+server/tuning/main.lua
+    ├── vehicle_value.lua (dynamic pricing)
+    ├── modification_codes.lua (mod tracking)
+    └── fitment.lua (wheel fitment sync)
+```
+
+### Assembly System Flow
+
+```
+client/assembly/main.lua
+    ├── customer_vehicle.lua (vehicle visibility)
+    └── pending_mods_hook.lua (garage integration)
+         ↓
+server/assembly/main.lua
+    └── vehicle_visibility.lua (cross-player sync)
+```
+
+### Illegal Network (Redline) Flow
+
+```
+modules/illegal_network/client/
+    ├── init.lua (initialization)
+    ├── vehicle_analysis.lua (VIN scanner)
+    ├── illegal_tuning.lua (illegal mods)
+    └── nui_callbacks.lua (NUI handlers)
+         ↓
+modules/illegal_network/server/
+    ├── init.lua (initialization)
+    ├── heat.lua (wanted system)
+    ├── redline_profiles.lua (reputation)
+    ├── marketplace.lua (darknet market)
+    └── vehicle_analysis.lua (VIN database)
+```
+
+## Database Tables
+
+### Core Tables (ds_mechanic_ prefix)
+
+| Table | Purpose |
+|-------|---------|
+| `ds_mechanic_shops` | Shop definitions and settings |
+| `ds_mechanic_employees` | Employee records |
+| `ds_mechanic_orders` | Work orders |
+| `ds_mechanic_order_items` | Order line items |
+| `ds_mechanic_service_history` | Completed services |
+| `ds_mechanic_zones` | Tuning/repair/storage zones |
+| `ds_mechanic_lifts` | Hydraulic lift data |
+| `ds_mechanic_vehicle_mods` | Saved vehicle modifications |
+| `ds_mechanic_vehicle_stance` | Stance/camber settings |
+| `ds_mechanic_transactions` | Financial transactions |
+
+### Illegal Network Tables
+
+| Table | Purpose |
+|-------|---------|
+| `ds_mechanic_redline_profiles` | Underground profiles |
+| `ds_mechanic_redline_listings` | Marketplace listings |
+| `ds_mechanic_vehicle_heat` | Heat tracking |
+| `ds_mechanic_fake_plates` | Fake plate registry |
+
+## Exports (API)
+
+### Server Exports
+
+```lua
+-- Garage integration
+exports.dusa_mechanicv2:IsVehicleLockedByMechanic(plate)
+exports.dusa_mechanicv2:GetLockedVehicles()
+exports.dusa_mechanicv2:GetVehicleOrderStatus(plate)
+exports.dusa_mechanicv2:HasPendingMods(plate)
+exports.dusa_mechanicv2:GetPendingMods(plate)
+exports.dusa_mechanicv2:ApplyPendingMods(vehicle, plate)
+exports.dusa_mechanicv2:IsVehicleInAssembly(plate)
+
+-- Debug
+exports.dusa_mechanicv2:getDebugLevel()
+exports.dusa_mechanicv2:setDebugLevel(level)
+exports.dusa_mechanicv2:getLogger()
+
+-- Admin
+exports.dusa_mechanicv2:isAdmin(source)
+exports.dusa_mechanicv2:runMigrations()
+exports.dusa_mechanicv2:getMigrationStatus()
+```
+
+### Client Exports
+
+```lua
+exports.dusa_mechanicv2:openAdminUI()
+exports.dusa_mechanicv2:closeAdminUI()
+exports.dusa_mechanicv2:isAdminUIOpen()
+exports.dusa_mechanicv2:isNitroActive()
+exports.dusa_mechanicv2:getNitroStatus()
+exports.dusa_mechanicv2:RefreshShopBlips()
+```
+
+## Load Order (Critical)
+
+The fxmanifest.lua defines strict load order:
+
+### Server Load Order
+1. `shared_scripts` - Constants, config (globals)
+2. `server/debug/` - Logging (MechanicLogger global)
+3. `server/database/` - MySQL, migrations
+4. `server/admin/` - Admin commands
+5. `server/tablet/` - Permissions, validation, callbacks
+6. `server/tuning/` - Tuning logic
+7. `server/assembly/` - Assembly system
+8. `server/zones/` - Zone management
+9. `server/craft/` - Crafting system
+10. `modules/illegal_network/server/` - Redline
+
+### Client Load Order
+1. `client/debug/` - ClientDebug global
+2. `client/locales/` - Locale modules
+3. `client/tablet_integration.lua` - Main NUI handler
+4. Feature modules (admin, assembly, craft, etc.)
+5. `modules/illegal_network/client/`
+
+## Escrow Considerations
+
+Files in `escrow_ignore` section of fxmanifest are open source. Other files are escrow-protected and use global pattern (no return statement).
+
+Open source files can use `require()`. Escrow files must use global tables.

@@ -115,6 +115,70 @@
         ]
       },
       {
+        "tab": "DUSA Mechanic V2",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "scripts/dusa_mechanicv2/introduction",
+              "scripts/dusa_mechanicv2/installation"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "scripts/dusa_mechanicv2/configuration/main-config",
+              "scripts/dusa_mechanicv2/configuration/tuning-config",
+              "scripts/dusa_mechanicv2/configuration/assembly-config",
+              "scripts/dusa_mechanicv2/configuration/lift-config",
+              "scripts/dusa_mechanicv2/configuration/repair-config",
+              "scripts/dusa_mechanicv2/configuration/craft-config"
+            ]
+          },
+          {
+            "group": "Server Modules",
+            "pages": [
+              "scripts/dusa_mechanicv2/server/debug",
+              "scripts/dusa_mechanicv2/server/database",
+              "scripts/dusa_mechanicv2/server/tablet",
+              "scripts/dusa_mechanicv2/server/tuning",
+              "scripts/dusa_mechanicv2/server/zones",
+              "scripts/dusa_mechanicv2/server/craft",
+              "scripts/dusa_mechanicv2/server/assembly",
+              "scripts/dusa_mechanicv2/server/admin",
+              "scripts/dusa_mechanicv2/server/stance",
+              "scripts/dusa_mechanicv2/server/items"
+            ]
+          },
+          {
+            "group": "Client Modules",
+            "pages": [
+              "scripts/dusa_mechanicv2/client/tablet-integration",
+              "scripts/dusa_mechanicv2/client/tuning",
+              "scripts/dusa_mechanicv2/client/lifts",
+              "scripts/dusa_mechanicv2/client/assembly"
+            ]
+          },
+          {
+            "group": "Illegal Network (Redline)",
+            "pages": [
+              "scripts/dusa_mechanicv2/illegal-network/overview",
+              "scripts/dusa_mechanicv2/illegal-network/vehicle-analysis"
+            ]
+          },
+          {
+            "group": "AI Reference",
+            "pages": [
+              "scripts/dusa_mechanicv2/ai-internal/codebase-map",
+              "scripts/dusa_mechanicv2/ai-internal/database-schema",
+              "scripts/dusa_mechanicv2/ai-internal/api-reference",
+              "scripts/dusa_mechanicv2/ai-internal/troubleshooting",
+              "scripts/dusa_mechanicv2/ai-internal/feature-keywords"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {

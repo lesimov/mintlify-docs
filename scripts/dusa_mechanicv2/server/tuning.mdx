@@ -1,0 +1,337 @@
+---
+title: "Tuning System"
+description: "Server-side vehicle tuning, modification codes, dynamic pricing, and fitment synchronization"
+---
+
+# Tuning System
+
+The server-side tuning system handles vehicle modification purchases, price calculations, order management, and cross-client synchronization.
+
+## Overview
+
+The tuning module consists of four main components:
+
+1. **Main** - Purchase handlers and order management
+2. **Vehicle Value** - Dynamic pricing based on vehicle value
+3. **Modification Codes** - Unique code generation for applied mods
+4. **Fitment** - Wheel fitment (camber, offset, width) synchronization
+
+## Purchase Flow
+
+### Client Request
+
+```lua
+-- Client sends purchase request
+local result = lib.callback.await('mechanic:tuning:purchase', false, {
+    vehicleNetId = netId,
+    mods = {
+        { type = 11, index = 3, price = 5000 },  -- Engine
+        { type = 12, index = 2, price = 3000 },  -- Brakes
+    },
+    totalPrice = 8000,
+})
+```
+
+### Server Processing
+
+```lua
+lib.callback.register('mechanic:tuning:purchase', function(source, data)
+    -- 1. Validate player and vehicle
+    local player = Framework.GetPlayer(source)
+    if not player then return { success = false, error = 'Player not found' } end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Vehicle not found' }
+    end
+
+    -- 2. Re-validate prices server-side
+    local serverTotal = TuningMain.calculateTotalPrice(data.mods, vehicle)
+    if serverTotal ~= data.totalPrice then
+        MechanicLogger.warn('TUNING', 'Price mismatch', {
+            client = data.totalPrice,
+            server = serverTotal,
+        })
+        return { success = false, error = 'Price validation failed' }
+    end
+
+    -- 3. Check player funds
+    local playerMoney = player.GetMoney('bank')
+    if playerMoney < serverTotal then
+        return { success = false, error = 'Insufficient funds' }
+    end
+
+    -- 4. Process payment
+    player.RemoveMoney('bank', serverTotal, 'Vehicle tuning')
+
+    -- 5. Apply mods and save
+    local modCode = TuningMain.applyMods(source, vehicle, data.mods)
+
+    -- 6. Record service history
+    TuningMain.recordService(source, vehicle, data.mods, serverTotal)
+
+    return {
+        success = true,
+        modCode = modCode,
+        totalPaid = serverTotal,
+    }
+end)
+```
+
+## Dynamic Pricing
+
+### Vehicle Value Lookup
+
+The system calculates prices based on the vehicle's base value:
+
+```lua
+-- Get vehicle value
+local vehicleValue = VehicleValue.get(model)
+-- Returns: 45000 (from config or framework)
+
+-- Calculate mod price with multiplier
+local basePrice = MechanicConfig.Tuning.ModPrices[modType][modIndex]
+local multiplier = VehicleValue.getPriceMultiplier(vehicleValue)
+local finalPrice = math.floor(basePrice * multiplier)
+```
+
+### Price Multiplier Tiers
+
+```lua
+MechanicConfig.Tuning.PriceMultipliers = {
+    { maxValue = 50000, multiplier = 1.0 },    -- Economy cars
+    { maxValue = 100000, multiplier = 1.2 },   -- Mid-range
+    { maxValue = 250000, multiplier = 1.5 },   -- Sports cars
+    { maxValue = 500000, multiplier = 2.0 },   -- Luxury
+    { maxValue = math.huge, multiplier = 2.5 }, -- Supercars
+}
+```
+
+### Fallback Vehicle Prices
+
+When framework doesn't provide vehicle prices, the system uses `config.vehicle_prices.lua`:
+
+```lua
+MechanicConfig.VehiclePrices = {
+    ['sultan'] = 25000,
+    ['elegy2'] = 95000,
+    ['zentorno'] = 725000,
+    -- ... more vehicles
+}
+```
+
+## Modification Codes
+
+Each tuning session generates a unique modification code for tracking:
+
+### Code Generation
+
+```lua
+-- Generate unique mod code
+local code = ModificationCodes.generate(vehicle, mods)
+-- Returns: "TUN-ABC123-2024"
+
+-- Code format: TUN-{random}-{year}
+```
+
+### Code Verification
+
+```lua
+-- Verify a modification code
+local isValid, details = ModificationCodes.verify(code)
+-- Returns: true, { vehicle = ..., mods = ..., date = ... }
+
+-- Get all codes for a vehicle
+local codes = ModificationCodes.getByPlate(plate)
+```
+
+### Database Storage
+
+```sql
+CREATE TABLE ds_mechanic_mod_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(32) NOT NULL UNIQUE,
+    plate VARCHAR(16) NOT NULL,
+    vehicle_model VARCHAR(32),
+    mods JSON,
+    applied_by VARCHAR(64),
+    shop_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plate (plate),
+    INDEX idx_code (code)
+);
+```
+
+## Fitment Synchronization
+
+The fitment system synchronizes wheel customization across all clients.
+
+### Fitment Data Structure
+
+```lua
+local fitment = {
+    frontCamber = -5.0,    -- Degrees (-15 to 15)
+    rearCamber = -5.0,
+    frontOffset = 0.02,    -- Offset in meters
+    rearOffset = 0.02,
+    frontWidth = 0.1,      -- Additional width
+    rearWidth = 0.1,
+}
+```
+
+### Server Sync
+
+```lua
+-- Apply fitment and sync to all clients
+lib.callback.register('mechanic:tuning:applyFitment', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+
+    -- Store fitment data
+    Fitment.save(GetVehicleNumberPlateText(vehicle), data.fitment)
+
+    -- Sync to all clients
+    Fitment.syncToAll(data.vehicleNetId, data.fitment)
+
+    return { success = true }
+end)
+
+-- Sync function
+function Fitment.syncToAll(vehicleNetId, fitmentData)
+    TriggerClientEvent('mechanic:tuning:fitmentSync', -1, vehicleNetId, fitmentData)
+end
+```
+
+### Persistence
+
+```lua
+-- Save fitment to database
+function Fitment.save(plate, fitmentData)
+    MySQL.insert.await([[
+        INSERT INTO ds_mechanic_fitment (plate, fitment_data)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE fitment_data = VALUES(fitment_data)
+    ]], { plate, json.encode(fitmentData) })
+end
+
+-- Load fitment when vehicle spawns
+function Fitment.load(plate)
+    local result = MySQL.single.await([[
+        SELECT fitment_data FROM ds_mechanic_fitment WHERE plate = ?
+    ]], { plate })
+
+    return result and json.decode(result.fitment_data) or nil
+end
+```
+
+## Order Management
+
+### Creating Tuning Orders
+
+```lua
+-- Create order before tuning session
+local orderId = TuningMain.createOrder({
+    shopId = shopId,
+    customerId = customerIdentifier,
+    vehiclePlate = plate,
+    vehicleModel = model,
+    requestedMods = mods,
+    estimatedPrice = totalPrice,
+})
+```
+
+### Completing Orders
+
+```lua
+-- Complete order after successful tuning
+TuningMain.completeOrder(orderId, {
+    appliedMods = mods,
+    finalPrice = totalPaid,
+    modCode = code,
+    mechanicId = source,
+})
+```
+
+## Service History
+
+### Recording Services
+
+```lua
+-- Automatically recorded after each tuning session
+TuningMain.recordService(source, vehicle, mods, totalPrice)
+
+-- Record includes:
+-- - Date/time
+-- - Mechanic identifier
+-- - Shop ID
+-- - Vehicle plate and model
+-- - Applied modifications
+-- - Total price paid
+```
+
+### Querying History
+
+```lua
+-- Get service history for a vehicle
+local history = TuningMain.getServiceHistory(plate, {
+    limit = 10,
+    offset = 0,
+})
+
+-- Get mechanic's service count
+local count = TuningMain.getMechanicServiceCount(mechanicId, {
+    startDate = '2024-01-01',
+    endDate = '2024-01-31',
+})
+```
+
+## Events
+
+### Server Events
+
+```lua
+-- Triggered after successful tuning
+TriggerEvent('mechanic:tuning:completed', {
+    source = source,
+    plate = plate,
+    mods = mods,
+    totalPrice = totalPrice,
+    modCode = modCode,
+})
+
+-- Listen for tuning completion
+AddEventHandler('mechanic:tuning:completed', function(data)
+    -- Custom logic (e.g., achievements, statistics)
+end)
+```
+
+### Client Notifications
+
+```lua
+-- Notify customer of completed tuning
+TriggerClientEvent('mechanic:tuning:notify', customerSource, {
+    type = 'completed',
+    modCode = modCode,
+    message = 'Your vehicle tuning is complete!',
+})
+```
+
+## Security Considerations
+
+1. **Always re-validate prices server-side** - Never trust client prices
+2. **Verify vehicle ownership** - Check player has access to vehicle
+3. **Rate limiting** - Prevent rapid purchase spam
+4. **Transaction logging** - Record all financial transactions
+5. **Rollback support** - Handle failed transactions gracefully
+
+```lua
+-- Example: Price validation
+local function validatePrices(clientMods, vehicle)
+    for _, mod in ipairs(clientMods) do
+        local serverPrice = TuningMain.getModPrice(mod.type, mod.index, vehicle)
+        if math.abs(serverPrice - mod.price) > 1 then
+            return false, 'Price mismatch for mod type ' .. mod.type
+        end
+    end
+    return true
+end
+```

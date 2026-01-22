@@ -1,0 +1,90 @@
+---
+title: "Main Configuration"
+description: "Ana yapılandırma dosyası - shared/config.lua"
+---
+
+# Ana Yapılandırma
+
+`shared/config.lua` dosyası kaynak genelinde kullanılan temel ayarları içerir.
+
+## Debug Ayarları
+
+```lua
+MechanicConfig.Debug = {
+    Enabled = false,        -- Debug modunu etkinleştir
+    DefaultLevel = 7,       -- 7 = SILENT (log yok)
+}
+```
+
+Debug seviyeleri:
+- `1` - TRACE
+- `2` - DEBUG
+- `3` - INFO
+- `4` - WARN
+- `5` - ERROR
+- `6` - FATAL
+- `7` - SILENT
+
+## Telemetri Ayarları
+
+```lua
+MechanicConfig.Telemetry = {
+    SentryDSN = '...',              -- Sentry DSN
+    RateLimitSeconds = 30,          -- Hata raporlama limiti
+    MaxErrorsPerMinute = 10,        -- Dakika başı maksimum hata
+    RequestTimeout = 2000,          -- Timeout (ms)
+    ExcludePlayerData = true,       -- Oyuncu verisi hariç tut
+}
+```
+
+## Veritabanı Ayarları
+
+```lua
+MechanicConfig.Database = {
+    AutoMigration = true,           -- Otomatik migrasyon
+    MigrationVerbose = false,       -- Detaylı log
+}
+```
+
+## Zone Marker Ayarları
+
+```lua
+MechanicConfig.ZoneMarkers = {
+    Enabled = true,                 -- Zone işaretçileri
+    MarkerType = 1,                 -- 1 = silindir
+    Height = 0.1,                   -- Z offset
+    Alpha = 100,                    -- Şeffaflık (0-255)
+    Colors = {
+        tuning = { r = 0, g = 255, b = 100 },   -- Yeşil
+        repair = { r = 255, g = 165, b = 0 },   -- Turuncu
+        storage = { r = 100, g = 100, b = 255 },-- Mavi
+        shop = { r = 0, g = 200, b = 255 },     -- Cyan
+    },
+}
+```
+
+## Maaş Sistemi
+
+```lua
+MechanicConfig.Salary = {
+    Enabled = true,                 -- Otomatik maaş ödemeleri
+    PaymentInterval = '1d',         -- '1h', '1d', '3d', '1w'
+    PaymentSource = 'shop_safe',    -- 'shop_safe' veya 'system'
+    SkipIfInsufficientFunds = true, -- Yetersiz bakiye atla
+    NotifyEmployee = true,          -- Çalışana bildir
+    NotifyBoss = true,              -- Patrona bildir
+}
+```
+
+## İş Sistemi
+
+```lua
+MechanicConfig.JobSystem = {
+    SyncWithFramework = true,       -- Framework job sync
+    JobName = 'mechanic',           -- Varsayılan iş adı
+    JobIndexedMode = true,          -- Her dükkan ayrı iş
+    AutoInsertJobMembers = true,    -- Otomatik çalışan ekleme
+    UseFrameworkGrades = true,      -- Framework grade kullan
+    OwnerMaxGrade = 4,              -- Owner grade
+}
+```

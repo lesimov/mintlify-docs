@@ -1,0 +1,484 @@
+---
+title: "Troubleshooting Guide"
+description: "Common issues, error resolution, and debugging procedures for dusa_mechanicv2"
+---
+
+# Troubleshooting Guide
+
+This document helps AI assistants diagnose and resolve common issues in dusa_mechanicv2.
+
+## Quick Diagnosis Commands
+
+```bash
+# In-game console commands
+mechanic_db_status         # Check database connection
+mechanic_health_check      # Check for missing tables
+mechanic_health_repair     # Repair missing tables
+mechanic_fix_collation     # Fix collation issues
+mechanic_debug [level]     # Set debug level (1-7)
+```
+
+## Database Issues
+
+### Issue: "Table doesn't exist" Error
+
+**Symptoms:**
+- Console shows "Table 'ds_mechanic_*' doesn't exist"
+- Tablet fails to load data
+- Orders or employees not saving
+
+**Diagnosis:**
+```lua
+-- Check migration status
+local status = exports.dusa_mechanicv2:getMigrationStatus()
+print(json.encode(status.pending)) -- Shows unapplied migrations
+```
+
+**Resolution:**
+1. Enable auto-migration in config:
+```lua
+MechanicConfig.Database.AutoMigration = true
+```
+2. Restart resource: `ensure dusa_mechanicv2`
+3. Or run manual migration: `mechanic_health_repair`
+
+### Issue: Collation Mismatch
+
+**Symptoms:**
+- "Illegal mix of collations" error
+- Foreign key creation fails
+- Join queries fail
+
+**Cause:** Tables created with `utf8mb4_unicode_ci` instead of `utf8mb4_general_ci`
+
+**Resolution:**
+```bash
+# In-game command
+mechanic_fix_collation
+
+# Or SQL manually
+ALTER TABLE ds_mechanic_shops CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+```
+
+### Issue: Foreign Key Constraint Fails
+
+**Symptoms:**
+- "Cannot add or update child row" error
+- Employee creation fails
+- Zone creation fails
+
+**Cause:** Referenced shop_id doesn't exist
+
+**Resolution:**
+1. Verify shop exists:
+```lua
+local shop = MySQL.single.await('SELECT id FROM ds_mechanic_shops WHERE id = ?', { shopId })
+```
+2. Create shop first if missing
+3. Check for orphaned records
+
+## Permission Issues
+
+### Issue: "Permission denied" on All Actions
+
+**Symptoms:**
+- Player can't create orders
+- Employee management fails
+- All tablet actions rejected
+
+**Diagnosis:**
+```lua
+-- Server-side check
+local shopId = TabletPermissions.getPlayerShopId(source)
+print('Player shop:', shopId) -- Should show shop ID
+
+local grade = TabletPermissions.getPlayerGrade(source)
+print('Player grade:', grade) -- Should show 0-4
+```
+
+**Common Causes:**
+1. Player not employed at any shop
+2. Job name mismatch between framework and shop config
+3. Employee record inactive
+
+**Resolution:**
+```lua
+-- Check employee record
+local employee = MySQL.single.await([[
+    SELECT * FROM ds_mechanic_employees 
+    WHERE identifier = ? AND is_active = 1
+]], { playerIdentifier })
+
+-- If missing, add employee
+TabletDatabase.addEmployee({
+    shopId = shopId,
+    identifier = playerIdentifier,
+    displayName = playerName,
+    grade = 0,
+})
+```
+
+### Issue: Owner Can't Access Management
+
+**Symptoms:**
+- Shop owner can't manage employees
+- Owner permission checks fail
+
+**Cause:** `owner_identifier` column empty or mismatched
+
+**Resolution:**
+```lua
+-- Check shop owner
+local shop = MySQL.single.await('SELECT owner_identifier FROM ds_mechanic_shops WHERE id = ?', { shopId })
+
+-- Update if needed
+MySQL.update.await('UPDATE ds_mechanic_shops SET owner_identifier = ? WHERE id = ?', 
+    { ownerIdentifier, shopId })
+```
+
+## Tuning Issues
+
+### Issue: Mods Not Applying
+
+**Symptoms:**
+- Purchase succeeds but mods don't appear
+- Vehicle reverts after respawn
+
+**Diagnosis:**
+1. Check pending mods table:
+```lua
+local pending = MySQL.single.await(
+    'SELECT * FROM ds_mechanic_pending_vehicle_mods WHERE plate = ?', 
+    { plate }
+)
+```
+2. Check vehicle_mods table:
+```lua
+local mods = MySQL.single.await(
+    'SELECT props FROM ds_mechanic_vehicle_mods WHERE plate = ?', 
+    { plate }
+)
+```
+
+**Common Causes:**
+1. Garage resource not calling ApplyPendingMods
+2. Race condition between mod save and vehicle spawn
+3. Vehicle model doesn't support the mod type
+
+**Resolution:**
+1. Ensure garage integration:
+```lua
+-- In garage spawn code
+local hasPending = exports.dusa_mechanicv2:HasPendingMods(plate)
+if hasPending then
+    exports.dusa_mechanicv2:ApplyPendingMods(vehicle, plate)
+end
+```
+
+### Issue: Dynamic Pricing Returns 0
+
+**Symptoms:**
+- All mods show $0 price
+- Vehicle value calculation fails
+
+**Diagnosis:**
+```lua
+-- Check vehicle value lookup
+local value = lib.callback.await('mechanic:tuning:getVehicleValue', false, {
+    vehicleNetId = netId
+})
+print('Vehicle value:', value.value, 'Class:', value.class)
+```
+
+**Common Causes:**
+1. Vehicle not in price database
+2. Fallback prices not configured
+
+**Resolution:**
+1. Add vehicle to `shared/config.vehicle_prices.lua`:
+```lua
+VehiclePrices = {
+    ['sultan'] = 35000,
+    ['elegy'] = 95000,
+}
+```
+2. Or rely on class-based fallback in config
+
+### Issue: Camera Not Working
+
+**Symptoms:**
+- Tuning camera doesn't activate
+- Player not frozen during tuning
+- Can't see vehicle in tuning mode
+
+**Diagnosis:**
+```lua
+-- Client-side check
+print('Camera active:', TuningCamera.active)
+print('Camera cam:', TuningCamera.cam)
+```
+
+**Common Causes:**
+1. Another script controlling camera
+2. Player not in vehicle when entering zone
+3. ox_lib cache not available
+
+**Resolution:**
+1. Ensure ox_lib cache is enabled:
+```lua
+-- fxmanifest.lua
+ox_libs { 'cache' }
+```
+2. Check for camera conflicts
+
+## Assembly Issues
+
+### Issue: Assembly Tasks Not Completing
+
+**Symptoms:**
+- Progress bar finishes but task stays pending
+- Skill check results not registering
+
+**Diagnosis:**
+```lua
+-- Check assembly state server-side
+local assembly = AssemblyState.get(assemblyId)
+print('Tasks:', json.encode(assembly.tasks))
+```
+
+**Common Causes:**
+1. Network timeout on skill check result
+2. Assembly already cancelled
+3. Task already completed
+
+**Resolution:**
+1. Increase callback timeout
+2. Add retry logic for skill check submission
+
+### Issue: Customer Vehicle Visibility
+
+**Symptoms:**
+- Customer can see their vehicle during assembly
+- Or vehicle invisible after assembly
+
+**Cause:** Vehicle visibility sync not working
+
+**Resolution:**
+```lua
+-- Server: Hide vehicle from customer
+SetEntityDistanceCullingRadius(vehicle, 0.0)
+
+-- Server: Show vehicle to customer after assembly
+ResetEntityDistanceCullingRadius(vehicle)
+```
+
+## Craft System Issues
+
+### Issue: Recipe Not Found
+
+**Symptoms:**
+- "Invalid recipe" error
+- Craft menu shows no items
+
+**Diagnosis:**
+```lua
+-- Check recipe loading
+local recipes = CraftRecipes.getAll()
+print('Loaded recipes:', #recipes)
+```
+
+**Common Causes:**
+1. `config/craft_recipes.json` malformed
+2. JSON parsing error
+
+**Resolution:**
+1. Validate JSON syntax
+2. Check for trailing commas
+3. Ensure file is in `files` section of fxmanifest
+
+### Issue: Fake Plate Already Exists
+
+**Symptoms:**
+- "Plate already exists" error
+- Can't create common plate texts
+
+**Cause:** Plate text matches existing real or fake plate
+
+**Resolution:**
+1. Use unique plate text
+2. Check existing plates:
+```lua
+local exists = MySQL.single.await(
+    'SELECT 1 FROM ds_mechanic_fake_plates WHERE fake_plate = ?',
+    { plateText }
+)
+```
+
+## Illegal Network Issues
+
+### Issue: Heat Not Decaying
+
+**Symptoms:**
+- Player heat level stuck
+- No decay over time
+
+**Diagnosis:**
+```lua
+local heat = MySQL.single.await(
+    'SELECT * FROM ds_mechanic_vehicle_heat WHERE identifier = ?',
+    { identifier }
+)
+print('Decay paused:', heat.decay_paused)
+```
+
+**Cause:** Decay paused flag set or interval not running
+
+**Resolution:**
+1. Check config:
+```lua
+MechanicConfig.IllegalNetwork.Heat.DecayInterval -- Should be > 0
+```
+2. Unpause decay:
+```lua
+MySQL.update.await(
+    'UPDATE ds_mechanic_vehicle_heat SET decay_paused = 0 WHERE identifier = ?',
+    { identifier }
+)
+```
+
+### Issue: Redline Profile Not Creating
+
+**Symptoms:**
+- "No network access" error
+- Profile creation fails
+
+**Common Causes:**
+1. Player doesn't have access item
+2. Alias already taken
+
+**Resolution:**
+1. Give access item:
+```lua
+Framework.AddItem(source, 'redline_access_card', 1)
+```
+2. Check alias uniqueness:
+```lua
+local exists = MySQL.single.await(
+    'SELECT 1 FROM ds_mechanic_redline_profiles WHERE alias = ?',
+    { alias }
+)
+```
+
+## Zone Issues
+
+### Issue: Zone Not Detected
+
+**Symptoms:**
+- No interaction prompt in zone
+- Zone markers not showing
+
+**Diagnosis:**
+```lua
+-- Client: Check loaded zones
+print('Tuning zones:', #TuningZones.all)
+print('Current zone:', TuningZones.currentZone)
+```
+
+**Common Causes:**
+1. Zone not active in database
+2. Zone coords incorrect
+3. Zone too small
+
+**Resolution:**
+1. Check zone in database:
+```lua
+local zones = MySQL.query.await(
+    'SELECT * FROM ds_mechanic_zones WHERE shop_id = ? AND is_active = 1',
+    { shopId }
+)
+```
+2. Verify coords and radius
+
+### Issue: Storage Zone Not Opening
+
+**Symptoms:**
+- Storage interaction fails
+- "Stash not found" error
+
+**Cause:** ox_inventory stash not registered
+
+**Resolution:**
+1. Ensure stash registration on startup:
+```lua
+-- In server/zones/storage_zones.lua
+exports.ox_inventory:RegisterStash(stashId, 'Shop Storage', slots, weight)
+```
+
+## NUI/UI Issues
+
+### Issue: Tablet Not Opening
+
+**Symptoms:**
+- Tablet app doesn't appear
+- NUI focus not set
+
+**Diagnosis:**
+- Check browser console (F8 → NUI)
+- Look for JavaScript errors
+
+**Common Causes:**
+1. Build not run (`npm run build` in web/)
+2. dist/ folder missing
+3. React error in component
+
+**Resolution:**
+1. Rebuild UI:
+```bash
+cd web
+npm run build
+```
+2. Check fxmanifest files section includes `dist/**/*`
+
+### Issue: NUI Callback Timeout
+
+**Symptoms:**
+- Tablet loads but actions don't work
+- "Callback timed out" in console
+
+**Common Causes:**
+1. Server callback not registered
+2. Permission check failing silently
+3. Database query hanging
+
+**Resolution:**
+1. Add logging to callback:
+```lua
+lib.callback.register('mechanic:tablet:action', function(source, data)
+    MechanicLogger.debug('TABLET', 'Callback received', { source = source })
+    -- ... rest of handler
+end)
+```
+
+## Debug Mode
+
+Enable verbose logging:
+
+```lua
+-- Server console
+mechanic_debug 1  -- TRACE (most verbose)
+mechanic_debug 2  -- DEBUG
+mechanic_debug 3  -- INFO (default)
+```
+
+Categories to watch:
+- `TABLET` - Tablet operations
+- `TUNING` - Tuning system
+- `DATABASE` - DB queries
+- `ZONES` - Zone detection
+- `ILLEGAL` - Redline network
+
+## Log Locations
+
+- **Server Console**: All MechanicLogger output
+- **Client Console (F8)**: ClientDebug output
+- **NUI Console (F8 → NUI)**: React errors, postNui logs

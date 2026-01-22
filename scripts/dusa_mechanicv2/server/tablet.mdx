@@ -1,0 +1,348 @@
+---
+title: "Tablet System"
+description: "Server-side tablet integration including permissions, validation, database queries, and callbacks"
+---
+
+# Tablet System
+
+The tablet system provides the server-side infrastructure for the mechanic tablet UI, handling permissions, data validation, database operations, and API callbacks.
+
+## Overview
+
+The tablet system consists of five main modules:
+
+1. **Permissions** - Job and grade-based access control
+2. **Validation** - Input sanitization and error handling
+3. **Database** - Query abstractions for tablet operations
+4. **Events** - Server-to-client event handling
+5. **Callbacks** - API endpoints for tablet requests
+
+## Permissions System
+
+### Permission Levels
+
+| Level | Description | Example Roles |
+|-------|-------------|---------------|
+| `view` | Read-only access | All employees |
+| `create` | Can create orders/records | Technicians |
+| `edit` | Can modify existing records | Senior techs |
+| `manage` | Full shop management | Managers |
+| `admin` | System-wide access | Owners |
+
+### Permission Checks
+
+```lua
+-- Check if player can view orders
+if not TabletPermissions.canViewOrders(source) then
+    return TabletValidation.permissionDeniedError()
+end
+
+-- Check specific permission
+if not TabletPermissions.hasPermission(source, 'manage_employees') then
+    return { success = false, error = 'No permission' }
+end
+
+-- Check shop-specific permission
+if not TabletPermissions.canManageShop(source, shopId) then
+    return TabletValidation.permissionDeniedError()
+end
+```
+
+### Available Permission Checks
+
+```lua
+TabletPermissions.canViewOrders(source)
+TabletPermissions.canCreateOrder(source)
+TabletPermissions.canEditOrder(source, orderId)
+TabletPermissions.canDeleteOrder(source, orderId)
+TabletPermissions.canViewEmployees(source)
+TabletPermissions.canHireEmployee(source)
+TabletPermissions.canFireEmployee(source, employeeId)
+TabletPermissions.canManageShop(source, shopId)
+TabletPermissions.canAccessTuning(source)
+TabletPermissions.canApplyMods(source)
+TabletPermissions.isShopOwner(source, shopId)
+TabletPermissions.isAdmin(source)
+```
+
+### Job-Based Permissions
+
+```lua
+-- Permission configuration in config
+MechanicConfig.Permissions = {
+    -- Grade-based permissions (0 = lowest)
+    Grades = {
+        [0] = { 'view_orders', 'view_employees' },
+        [1] = { 'view_orders', 'view_employees', 'create_order' },
+        [2] = { 'view_orders', 'view_employees', 'create_order', 'edit_order' },
+        [3] = { 'view_orders', 'view_employees', 'create_order', 'edit_order', 'manage_employees' },
+        [4] = { '*' }, -- All permissions
+    },
+    -- Job-indexed mode (multi-shop)
+    JobIndexed = {
+        ['mechanic'] = true,
+        ['tuner'] = true,
+    },
+}
+```
+
+## Validation System
+
+### Input Validation
+
+```lua
+-- Validate order data
+local isValid, error = TabletValidation.validateOrder(data)
+if not isValid then
+    return { success = false, error = error }
+end
+
+-- Validate employee data
+local isValid, error = TabletValidation.validateEmployee(data)
+
+-- Validate price (server-side re-validation)
+local isValid = TabletValidation.validatePrice(clientPrice, serverPrice)
+```
+
+### Error Responses
+
+```lua
+-- Standard error responses
+TabletValidation.permissionDeniedError()
+-- Returns: { success = false, error = 'Permission denied', code = 'PERMISSION_DENIED' }
+
+TabletValidation.notFoundError('Order')
+-- Returns: { success = false, error = 'Order not found', code = 'NOT_FOUND' }
+
+TabletValidation.invalidDataError('Invalid plate format')
+-- Returns: { success = false, error = 'Invalid plate format', code = 'INVALID_DATA' }
+
+TabletValidation.serverError()
+-- Returns: { success = false, error = 'Server error', code = 'SERVER_ERROR' }
+```
+
+### Sanitization
+
+```lua
+-- Sanitize string input
+local safeName = TabletValidation.sanitizeString(input, maxLength)
+
+-- Sanitize plate
+local safePlate = TabletValidation.sanitizePlate(plate)
+
+-- Sanitize numeric input
+local safeAmount = TabletValidation.sanitizeNumber(input, min, max)
+```
+
+## Database Module
+
+### Order Operations
+
+```lua
+-- Get orders for a shop
+local orders = TabletDatabase.getOrders(shopId, {
+    status = 'pending',
+    page = 1,
+    limit = 20,
+    sortBy = 'created_at',
+    sortOrder = 'DESC',
+})
+
+-- Get single order with items
+local order = TabletDatabase.getOrderWithItems(orderId)
+
+-- Create order
+local orderId = TabletDatabase.createOrder({
+    shopId = shopId,
+    customerId = customerId,
+    customerName = customerName,
+    vehiclePlate = plate,
+    vehicleModel = model,
+    status = 'pending',
+    notes = notes,
+})
+
+-- Update order status
+TabletDatabase.updateOrderStatus(orderId, 'in_progress', employeeId)
+```
+
+### Employee Operations
+
+```lua
+-- Get shop employees
+local employees = TabletDatabase.getEmployees(shopId, {
+    includeInactive = false,
+    page = 1,
+    limit = 50,
+})
+
+-- Add employee
+local employeeId = TabletDatabase.addEmployee({
+    shopId = shopId,
+    identifier = playerIdentifier,
+    displayName = playerName,
+    grade = 1,
+    salary = 5000,
+})
+
+-- Update employee
+TabletDatabase.updateEmployee(employeeId, {
+    grade = 2,
+    salary = 7500,
+})
+
+-- Remove employee (soft delete)
+TabletDatabase.removeEmployee(employeeId)
+```
+
+### Shop Operations
+
+```lua
+-- Get shop info
+local shop = TabletDatabase.getShop(shopId)
+
+-- Get shop by job
+local shop = TabletDatabase.getShopByJob(jobName)
+
+-- Update shop settings
+TabletDatabase.updateShopSettings(shopId, {
+    name = 'New Name',
+    settings = { ... },
+})
+```
+
+## Callbacks (API Endpoints)
+
+### Registering Callbacks
+
+```lua
+-- Pattern for all tablet callbacks
+lib.callback.register('mechanic:tablet:getOrders', function(source, data)
+    -- 1. Permission check
+    if not TabletPermissions.canViewOrders(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    -- 2. Input validation
+    local isValid, error = TabletValidation.validatePagination(data)
+    if not isValid then
+        return TabletValidation.invalidDataError(error)
+    end
+
+    -- 3. Get player's shop
+    local shopId = TabletPermissions.getPlayerShopId(source)
+    if not shopId then
+        return TabletValidation.notFoundError('Shop')
+    end
+
+    -- 4. Database query
+    local orders = TabletDatabase.getOrders(shopId, data)
+
+    -- 5. Return result
+    return { success = true, data = orders }
+end)
+```
+
+### Available Callbacks
+
+| Callback | Description |
+|----------|-------------|
+| `mechanic:tablet:getOrders` | Get paginated orders |
+| `mechanic:tablet:getOrder` | Get single order details |
+| `mechanic:tablet:createOrder` | Create new work order |
+| `mechanic:tablet:updateOrder` | Update order status/details |
+| `mechanic:tablet:deleteOrder` | Delete/cancel order |
+| `mechanic:tablet:getEmployees` | Get shop employees |
+| `mechanic:tablet:hireEmployee` | Add new employee |
+| `mechanic:tablet:fireEmployee` | Remove employee |
+| `mechanic:tablet:updateEmployee` | Update employee details |
+| `mechanic:tablet:getShopInfo` | Get shop information |
+| `mechanic:tablet:updateShopSettings` | Update shop settings |
+| `mechanic:tablet:getServiceHistory` | Get completed services |
+
+## Events System
+
+### Server-to-Client Events
+
+```lua
+-- Notify specific player
+TabletEvents.notifyPlayer(source, 'order_updated', {
+    orderId = orderId,
+    newStatus = 'completed',
+})
+
+-- Notify all shop employees
+TabletEvents.notifyShop(shopId, 'new_order', {
+    orderId = orderId,
+    customerName = customerName,
+})
+
+-- Broadcast to all online mechanics
+TabletEvents.broadcast('system_announcement', {
+    message = 'System maintenance in 5 minutes',
+})
+```
+
+### Event Types
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `order_created` | `{ orderId, customerName }` | New order received |
+| `order_updated` | `{ orderId, newStatus }` | Order status changed |
+| `order_deleted` | `{ orderId }` | Order was deleted |
+| `employee_hired` | `{ employeeId, name }` | New employee joined |
+| `employee_fired` | `{ employeeId }` | Employee was removed |
+| `shop_updated` | `{ shopId, changes }` | Shop settings changed |
+
+## Employee Job Sync
+
+The `employee_job_sync.lua` module keeps employee records synchronized with the framework's job system.
+
+```lua
+-- When player job changes, update mechanic employee status
+AddEventHandler('QBCore:Server:OnJobUpdate', function(source, job)
+    TabletSync.onJobChange(source, job)
+end)
+
+-- Sync display names from framework
+TabletSync.syncDisplayNames()
+```
+
+## Salary Payments
+
+Automatic salary payment system for shop employees.
+
+### Configuration
+
+```lua
+MechanicConfig.Salary = {
+    Enabled = true,
+    PaymentInterval = 60,        -- Minutes between payments
+    PaymentDay = 0,              -- 0 = daily, 1-7 = specific day
+    PaymentHour = 12,            -- Hour to process payments
+    MinimumOnlineTime = 30,      -- Minutes online required
+    MaxMissedPayments = 3,       -- Before auto-deactivation
+}
+```
+
+### Payment Processing
+
+```lua
+-- Manual payment trigger (admin only)
+TabletSalary.processPayments(shopId)
+
+-- Get payment history
+local history = TabletSalary.getPaymentHistory(employeeId, {
+    startDate = '2024-01-01',
+    endDate = '2024-01-31',
+})
+```
+
+## Best Practices
+
+1. **Always check permissions first** - Before any database operation
+2. **Validate all input** - Never trust client-provided data
+3. **Use TabletDatabase** - Don't write raw queries in callbacks
+4. **Return consistent responses** - Use TabletValidation error helpers
+5. **Log important operations** - Use MechanicLogger for audit trail
+6. **Handle errors gracefully** - Catch and return proper error responses

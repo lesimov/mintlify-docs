@@ -1,0 +1,296 @@
+---
+title: "Stance System"
+description: "Server-side stance remote control for camber and suspension adjustments"
+---
+
+# Stance System
+
+The stance system provides remote control functionality for adjusting vehicle camber and suspension settings.
+
+## Overview
+
+The stance system consists of two main components:
+
+1. **Database** - Persistence for stance settings
+2. **Sync** - Cross-client synchronization
+
+## Stance Data Structure
+
+```lua
+local stanceData = {
+    -- Front suspension
+    frontCamber = 0.0,       -- Degrees (-15 to 15)
+    frontHeight = 0.0,       -- Height offset (-0.1 to 0.1)
+
+    -- Rear suspension
+    rearCamber = 0.0,        -- Degrees (-15 to 15)
+    rearHeight = 0.0,        -- Height offset (-0.1 to 0.1)
+
+    -- Presets
+    activePreset = nil,      -- Current active preset name
+    presets = {},            -- Saved presets
+}
+```
+
+## Database Operations
+
+### Saving Stance
+
+```lua
+-- Save stance configuration
+function StanceDatabase.save(plate, stanceData)
+    MySQL.insert.await([[
+        INSERT INTO ds_mechanic_stance (plate, stance_data)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE
+        stance_data = VALUES(stance_data),
+        updated_at = NOW()
+    ]], { plate, json.encode(stanceData) })
+end
+
+-- Callback for client
+lib.callback.register('mechanic:stance:save', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Vehicle not found' }
+    end
+
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    StanceDatabase.save(plate, data.stanceData)
+
+    -- Sync to all clients
+    StanceSync.broadcast(data.vehicleNetId, data.stanceData)
+
+    return { success = true }
+end)
+```
+
+### Loading Stance
+
+```lua
+-- Load stance configuration
+function StanceDatabase.load(plate)
+    local result = MySQL.single.await([[
+        SELECT stance_data FROM ds_mechanic_stance WHERE plate = ?
+    ]], { plate })
+
+    if result then
+        return json.decode(result.stance_data)
+    end
+
+    return nil
+end
+
+-- Callback for client
+lib.callback.register('mechanic:stance:load', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false }
+    end
+
+    local plate = GetVehicleNumberPlateText(vehicle)
+    local stanceData = StanceDatabase.load(plate)
+
+    return {
+        success = true,
+        stanceData = stanceData,
+    }
+end)
+```
+
+### Saving Presets
+
+```lua
+lib.callback.register('mechanic:stance:savePreset', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    -- Load existing data
+    local stanceData = StanceDatabase.load(plate) or { presets = {} }
+
+    -- Add or update preset
+    stanceData.presets[data.presetName] = {
+        frontCamber = data.frontCamber,
+        frontHeight = data.frontHeight,
+        rearCamber = data.rearCamber,
+        rearHeight = data.rearHeight,
+        savedAt = os.time(),
+    }
+
+    -- Save
+    StanceDatabase.save(plate, stanceData)
+
+    return { success = true }
+end)
+```
+
+## Cross-Client Synchronization
+
+### Broadcasting Changes
+
+```lua
+-- Broadcast stance change to all clients
+function StanceSync.broadcast(vehicleNetId, stanceData)
+    TriggerClientEvent('mechanic:stance:sync', -1, {
+        vehicleNetId = vehicleNetId,
+        stanceData = stanceData,
+    })
+end
+
+-- Sync specific vehicle to new player
+function StanceSync.syncToPlayer(source, vehicleNetId)
+    local vehicle = NetworkGetEntityFromNetworkId(vehicleNetId)
+    if not DoesEntityExist(vehicle) then return end
+
+    local plate = GetVehicleNumberPlateText(vehicle)
+    local stanceData = StanceDatabase.load(plate)
+
+    if stanceData then
+        TriggerClientEvent('mechanic:stance:sync', source, {
+            vehicleNetId = vehicleNetId,
+            stanceData = stanceData,
+        })
+    end
+end
+```
+
+### Player Join Sync
+
+```lua
+-- Sync all nearby vehicles when player joins
+AddEventHandler('playerJoining', function()
+    local source = source
+
+    Wait(5000) -- Wait for player to fully load
+
+    -- Get all vehicles with stance data
+    local vehicles = GetAllVehicles()
+    for _, vehicle in ipairs(vehicles) do
+        local netId = NetworkGetNetworkIdFromEntity(vehicle)
+        if netId then
+            StanceSync.syncToPlayer(source, netId)
+        end
+    end
+end)
+```
+
+## Remote Controller Integration
+
+### Remote Item Usage
+
+```lua
+-- Handle stance remote item usage
+lib.callback.register('mechanic:items:useStanceRemote', function(source, data)
+    local item = Framework.GetItemBySlot(source, data.slot)
+    if not item or item.name ~= 'stance_remote' then
+        return { success = false, error = 'Invalid item' }
+    end
+
+    -- Check if remote is paired to a vehicle
+    local pairedPlate = item.metadata.pairedPlate
+    if not pairedPlate then
+        return { success = false, error = 'Remote not paired' }
+    end
+
+    -- Find vehicle by plate
+    local vehicle = StanceSync.findVehicleByPlate(pairedPlate)
+    if not vehicle then
+        return { success = false, error = 'Vehicle not found nearby' }
+    end
+
+    -- Load current stance
+    local stanceData = StanceDatabase.load(pairedPlate)
+
+    return {
+        success = true,
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+        stanceData = stanceData,
+        presets = stanceData and stanceData.presets or {},
+    }
+end)
+```
+
+### Pairing Remote
+
+```lua
+lib.callback.register('mechanic:stance:pairRemote', function(source, data)
+    local item = Framework.GetItemBySlot(source, data.slot)
+    if not item or item.name ~= 'stance_remote' then
+        return { success = false, error = 'Invalid item' }
+    end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Vehicle not found' }
+    end
+
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    -- Update item metadata
+    item.metadata.pairedPlate = plate
+    item.metadata.pairedModel = GetEntityModel(vehicle)
+    item.metadata.pairedAt = os.time()
+
+    -- Update in inventory
+    Framework.UpdateItemMetadata(source, data.slot, item.metadata)
+
+    return { success = true, plate = plate }
+end)
+```
+
+## Database Schema
+
+```sql
+CREATE TABLE ds_mechanic_stance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL UNIQUE,
+    stance_data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_plate (plate)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+## Configuration
+
+```lua
+MechanicConfig.Stance = {
+    -- Adjustment limits
+    Limits = {
+        camber = { min = -15.0, max = 15.0 },
+        height = { min = -0.1, max = 0.1 },
+    },
+
+    -- Step increments for remote
+    Steps = {
+        camber = 0.5,
+        height = 0.01,
+    },
+
+    -- Max presets per vehicle
+    MaxPresets = 5,
+
+    -- Sync settings
+    SyncRadius = 100.0,  -- Sync range in meters
+}
+```
+
+## Events
+
+```lua
+-- Stance changed event
+TriggerEvent('mechanic:stance:changed', {
+    plate = plate,
+    vehicleNetId = vehicleNetId,
+    stanceData = stanceData,
+    changedBy = source,
+})
+
+-- Preset applied event
+TriggerEvent('mechanic:stance:presetApplied', {
+    plate = plate,
+    presetName = presetName,
+    appliedBy = source,
+})
+```

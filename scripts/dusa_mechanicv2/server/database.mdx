@@ -1,0 +1,257 @@
+---
+title: "Database System"
+description: "Database initialization, migrations, and vehicle properties management"
+---
+
+# Database System
+
+The database system handles schema initialization, migrations, and vehicle property persistence.
+
+## Overview
+
+The database module consists of three main components:
+
+1. **Migration System** - Automatic schema updates and version control
+2. **Initialization** - Database connection and table setup
+3. **Vehicle Props** - Vehicle modification persistence
+
+## Migration System
+
+### Configuration
+
+```lua
+MechanicConfig.Database = {
+    AutoMigration = true,         -- Run migrations on startup
+    TablePrefix = 'ds_mechanic_', -- Table name prefix
+    MigrationTable = 'ds_mechanic_migrations',
+    BackupBeforeMigration = true,
+    LogQueries = false,
+}
+```
+
+### Migration Files
+
+Migrations are stored in `sql/migrations/` with a numbered naming convention:
+
+```
+sql/migrations/
+├── 001_initial_schema.sql
+├── 002_add_employee_display_name.sql
+├── 003_add_order_status_index.sql
+├── manifest.json
+```
+
+### Manifest Format
+
+```json
+{
+    "migrations": [
+        "001_initial_schema.sql",
+        "002_add_employee_display_name.sql",
+        "003_add_order_status_index.sql"
+    ]
+}
+```
+
+### Migration SQL Format
+
+```sql
+-- Migration: 002_add_employee_display_name
+-- Description: Add display_name column for caching player names
+
+ALTER TABLE ds_mechanic_employees
+ADD COLUMN display_name VARCHAR(64) DEFAULT NULL
+AFTER identifier;
+
+-- Update existing records
+UPDATE ds_mechanic_employees
+SET display_name = 'Unknown'
+WHERE display_name IS NULL;
+```
+
+### Running Migrations
+
+Migrations run automatically on resource start if `AutoMigration = true`. Manual control:
+
+```lua
+-- Check migration status
+local status = exports.dusa_mechanicv2:getMigrationStatus()
+-- Returns: { applied = {'001_...', '002_...'}, pending = {'003_...'} }
+
+-- Run pending migrations manually
+exports.dusa_mechanicv2:runMigrations()
+```
+
+## Database Tables
+
+### Core Tables
+
+| Table | Purpose |
+|-------|---------|
+| `ds_mechanic_shops` | Shop definitions and settings |
+| `ds_mechanic_employees` | Employee records with job/grade |
+| `ds_mechanic_orders` | Work orders and service requests |
+| `ds_mechanic_order_items` | Individual items in orders |
+| `ds_mechanic_service_history` | Completed service records |
+| `ds_mechanic_zones` | Tuning and work zones |
+| `ds_mechanic_lifts` | Hydraulic lift configurations |
+| `ds_mechanic_vehicle_mods` | Saved vehicle modifications |
+
+### Table Schema Example
+
+```sql
+CREATE TABLE ds_mechanic_shops (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    label VARCHAR(128) NOT NULL,
+    owner_identifier VARCHAR(64),
+    job_name VARCHAR(32),
+    location JSON,
+    settings JSON,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_job_name (job_name),
+    INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+## Vehicle Props System
+
+The vehicle props system persists vehicle modifications to the database.
+
+### Saving Vehicle Props
+
+```lua
+-- Server-side: Save vehicle modifications
+VehicleProps.save(plate, props)
+
+-- Props structure
+local props = {
+    plate = 'ABC123',
+    model = 'sultan',
+    mods = {
+        [11] = 3,  -- Engine level 3
+        [12] = 2,  -- Brakes level 2
+        [13] = 2,  -- Transmission level 2
+    },
+    colors = {
+        primary = 12,
+        secondary = 12,
+    },
+    extras = { [1] = true, [2] = false },
+    livery = 0,
+    -- ... more properties
+}
+```
+
+### Loading Vehicle Props
+
+```lua
+-- Get saved props for a vehicle
+local props = VehicleProps.get(plate)
+
+if props then
+    -- Apply to vehicle
+    SetVehicleModKit(vehicle, 0)
+    for modType, modIndex in pairs(props.mods) do
+        SetVehicleMod(vehicle, modType, modIndex, false)
+    end
+end
+```
+
+### Props Table Schema
+
+```sql
+CREATE TABLE ds_mechanic_vehicle_mods (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    props JSON NOT NULL,
+    applied_by VARCHAR(64),
+    shop_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_plate (plate),
+    INDEX idx_shop_id (shop_id),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+```
+
+## Health Checks
+
+The database system includes health checks for:
+
+1. **Connection Status** - Verify MySQL connection
+2. **Table Integrity** - Check all required tables exist
+3. **Collation Check** - Ensure proper character encoding
+4. **Index Validation** - Verify indexes are present
+
+```lua
+-- Run health check
+local health = Database.healthCheck()
+-- Returns: {
+--     connected = true,
+--     tables = { shops = true, employees = true, ... },
+--     collation = 'utf8mb4_general_ci',
+--     issues = {}
+-- }
+```
+
+## Collation Fix
+
+The migration system automatically fixes collation issues:
+
+```lua
+-- Automatic collation fix for utf8mb4_unicode_ci → utf8mb4_general_ci
+MechanicConfig.Database.AutoFixCollation = true
+```
+
+## Query Patterns
+
+### Using MySQL.query.await
+
+```lua
+-- Select with parameters
+local employees = MySQL.query.await([[
+    SELECT * FROM ds_mechanic_employees
+    WHERE shop_id = ? AND is_active = 1
+    ORDER BY hired_at DESC
+]], { shopId })
+
+-- Insert with returning ID
+local insertId = MySQL.insert.await([[
+    INSERT INTO ds_mechanic_orders (shop_id, customer_id, status)
+    VALUES (?, ?, 'pending')
+]], { shopId, customerId })
+
+-- Update
+local affectedRows = MySQL.update.await([[
+    UPDATE ds_mechanic_orders
+    SET status = ?, updated_at = NOW()
+    WHERE id = ?
+]], { 'completed', orderId })
+```
+
+### Transaction Support
+
+```lua
+-- Use transactions for multi-table operations
+MySQL.transaction.await({
+    {
+        query = 'UPDATE ds_mechanic_employees SET is_active = 0 WHERE id = ?',
+        values = { employeeId }
+    },
+    {
+        query = 'INSERT INTO ds_mechanic_audit_log (action, target_id) VALUES (?, ?)',
+        values = { 'employee_deactivated', employeeId }
+    }
+})
+```
+
+## Best Practices
+
+1. **Always use parameterized queries** - Prevent SQL injection
+2. **Use transactions** - For multi-table operations
+3. **Add indexes** - For frequently queried columns
+4. **Cache static data** - Don't query shop info repeatedly
+5. **Use proper collation** - `utf8mb4_general_ci` for consistency

@@ -1,0 +1,108 @@
+---
+title: "Tuning Configuration"
+description: "Araç tuning sistemi yapılandırması - shared/config.tuning.lua"
+---
+
+# Tuning Yapılandırması
+
+`shared/config.tuning.lua` dosyası araç modifikasyon sisteminin ayarlarını içerir.
+
+## Tuning Modu
+
+```lua
+MechanicConfig.Tuning.Mode = "order"  -- veya "direct"
+```
+
+- `"order"`: Satın almalar sipariş oluşturur, mekanik onayı gerekir
+- `"direct"`: Satın almalar anında uygulanır
+
+## Dinamik Fiyatlandırma
+
+Fiyatlar araç değerine göre hesaplanır:
+
+```
+Fiyat = AraçDeğeri × KategoriYüzdesi × KademeCarpanı
+```
+
+Örnek (100.000$ araç, Performans modu, Kademe 2):
+- Taban = 100.000 × 0.01 = 1.000$
+- Kademe 2 = 1 + (2 × 0.1) = 1.2
+- Final = 1.000 × 1.2 = 1.200$
+
+```lua
+MechanicConfig.Tuning.Pricing = {
+    UseDynamicPricing = true,
+    DefaultVehicleValue = 50000,
+    Categories = {
+        performance = {
+            enabled = true,
+            percentVehVal = 0.01,   -- %1
+            priceMult = 0.1,        -- +%10/kademe
+            fallbackPrice = 500,
+        },
+        cosmetics = { ... },
+        wheels = { ... },
+        respray = { percentVehVal = 0.005 },  -- %0.5
+        -- ...
+    },
+}
+```
+
+## Kamera Ayarları
+
+```lua
+MechanicConfig.Tuning.Camera = {
+    Enabled = true,
+    DefaultDistance = 6.0,
+    DefaultHeight = 1.5,
+    SmoothingFactor = 0.1,
+    TransitionDuration = 1000,
+    PedScenarios = {
+        'WORLD_HUMAN_LEANING',
+        'WORLD_HUMAN_STAND_MOBILE',
+        'WORLD_HUMAN_SMOKING',
+    },
+    PedDistance = 3.5,
+}
+```
+
+## Sipariş Ayarları
+
+```lua
+MechanicConfig.Tuning.OrderSettings = {
+    ExpiryTime = 60,                -- Dakika (0 = sınırsız)
+    MechanicCommission = 0.1,       -- %10 komisyon
+    NotifyAllMechanics = true,      -- Tüm mekaniklere bildir
+    RequireVehicleInZone = true,    -- Zone gereksinimi
+    RejectionServiceFee = 0.15,     -- %15 ret ücreti
+}
+```
+
+## Statik Fiyatlar
+
+Dinamik fiyatlandırma kapalıysa kullanılır:
+
+```lua
+MechanicConfig.Tuning.Prices = {
+    Performance = {
+        [11] = { [0] = 5000, [1] = 10000, ... },  -- Motor
+        [12] = { [0] = 3000, [1] = 6000, ... },   -- Fren
+        [18] = 7500,  -- Turbo (toggle)
+    },
+    Cosmetics = {
+        DefaultPrice = 1500,
+        [0] = 2500,   -- Spoyler
+        [1] = 3000,   -- Ön Tampon
+    },
+    Wheels = {
+        WheelType = 500,
+        WheelMod = 2000,
+    },
+    Special = {
+        WindowTint = 1000,
+        XenonHeadlights = 3000,
+        Neon = 5000,
+        BulletproofTyres = 25000,
+    },
+}
+```

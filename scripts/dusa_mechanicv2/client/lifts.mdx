@@ -1,0 +1,402 @@
+---
+title: "Lift System (Client)"
+description: "Client-side hydraulic lift controls with 6-part entity management"
+---
+
+# Client Lift System
+
+The lift system provides interactive hydraulic lifts for vehicle inspection and repair, featuring a 6-part entity structure for realistic movement.
+
+## Overview
+
+The lift system includes:
+
+1. **Main Controller** - Lift initialization and management
+2. **Entity Spawning** - 6-part lift prop management
+3. **Movement Control** - Raise/lower animations
+4. **Vehicle Attachment** - Vehicle positioning on lift
+
+## Lift Structure
+
+Each lift consists of 6 separate prop entities:
+
+```lua
+LiftConfig.Parts = {
+    [1] = { model = 'prop_movint_clip_lift_base', offset = vector3(0, 0, 0) },
+    [2] = { model = 'prop_movint_clip_lift_arm1', offset = vector3(0, 0, 0.2) },
+    [3] = { model = 'prop_movint_clip_lift_arm2', offset = vector3(0, 0, 0.4) },
+    [4] = { model = 'prop_movint_clip_lift_arm3', offset = vector3(0, 0, 0.6) },
+    [5] = { model = 'prop_movint_clip_lift_arm4', offset = vector3(0, 0, 0.8) },
+    [6] = { model = 'prop_movint_clip_lift_platform', offset = vector3(0, 0, 1.0) },
+}
+```
+
+## Lift Initialization
+
+### Spawning Lift Entities
+
+```lua
+-- Spawn all lift parts
+function LiftMain.spawn(liftId, coords, heading)
+    local liftData = {
+        id = liftId,
+        coords = coords,
+        heading = heading,
+        height = 0.0,
+        parts = {},
+        vehicle = nil,
+    }
+
+    -- Request models
+    for _, part in ipairs(LiftConfig.Parts) do
+        lib.requestModel(part.model)
+    end
+
+    -- Spawn each part
+    for i, part in ipairs(LiftConfig.Parts) do
+        local partCoords = vector3(
+            coords.x + part.offset.x,
+            coords.y + part.offset.y,
+            coords.z + part.offset.z
+        )
+
+        local entity = CreateObject(
+            GetHashKey(part.model),
+            partCoords.x, partCoords.y, partCoords.z,
+            false, false, false
+        )
+
+        SetEntityHeading(entity, heading)
+        FreezeEntityPosition(entity, true)
+        SetEntityCollision(entity, true, true)
+
+        liftData.parts[i] = {
+            entity = entity,
+            baseOffset = part.offset,
+        }
+    end
+
+    Lifts[liftId] = liftData
+
+    return liftData
+end
+```
+
+### Despawning Lifts
+
+```lua
+-- Remove lift entities
+function LiftMain.despawn(liftId)
+    local lift = Lifts[liftId]
+    if not lift then return end
+
+    -- Remove attached vehicle first
+    if lift.vehicle then
+        LiftMain.detachVehicle(liftId)
+    end
+
+    -- Delete all parts
+    for _, part in ipairs(lift.parts) do
+        if DoesEntityExist(part.entity) then
+            DeleteEntity(part.entity)
+        end
+    end
+
+    Lifts[liftId] = nil
+end
+```
+
+## Lift Movement
+
+### Raising the Lift
+
+```lua
+-- Raise lift to target height
+function LiftMain.raise(liftId, targetHeight, speed)
+    local lift = Lifts[liftId]
+    if not lift then return end
+
+    targetHeight = math.min(targetHeight, LiftConfig.MaxHeight)
+    speed = speed or LiftConfig.DefaultSpeed
+
+    -- Animate movement
+    CreateThread(function()
+        while lift.height < targetHeight do
+            Wait(0)
+
+            local step = speed * GetFrameTime()
+            lift.height = math.min(lift.height + step, targetHeight)
+
+            -- Update all parts
+            LiftMain.updatePartPositions(liftId)
+
+            -- Update attached vehicle
+            if lift.vehicle then
+                LiftMain.updateVehiclePosition(liftId)
+            end
+        end
+
+        -- Play sound
+        PlaySoundFromCoord(-1, 'LIFT_STOP', lift.coords.x, lift.coords.y, lift.coords.z, 'DLC_GR_MOC_SOUNDS', false, 20.0, false)
+    end)
+end
+```
+
+### Lowering the Lift
+
+```lua
+-- Lower lift to target height
+function LiftMain.lower(liftId, targetHeight, speed)
+    local lift = Lifts[liftId]
+    if not lift then return end
+
+    targetHeight = math.max(targetHeight, 0.0)
+    speed = speed or LiftConfig.DefaultSpeed
+
+    CreateThread(function()
+        while lift.height > targetHeight do
+            Wait(0)
+
+            local step = speed * GetFrameTime()
+            lift.height = math.max(lift.height - step, targetHeight)
+
+            LiftMain.updatePartPositions(liftId)
+
+            if lift.vehicle then
+                LiftMain.updateVehiclePosition(liftId)
+            end
+        end
+
+        PlaySoundFromCoord(-1, 'LIFT_STOP', lift.coords.x, lift.coords.y, lift.coords.z, 'DLC_GR_MOC_SOUNDS', false, 20.0, false)
+    end)
+end
+```
+
+### Updating Part Positions
+
+```lua
+-- Update all lift part positions based on current height
+function LiftMain.updatePartPositions(liftId)
+    local lift = Lifts[liftId]
+    if not lift then return end
+
+    for i, part in ipairs(lift.parts) do
+        -- Calculate height offset based on part index
+        local heightOffset = lift.height * (i / #lift.parts)
+
+        local newZ = lift.coords.z + part.baseOffset.z + heightOffset
+
+        SetEntityCoordsNoOffset(
+            part.entity,
+            lift.coords.x + part.baseOffset.x,
+            lift.coords.y + part.baseOffset.y,
+            newZ,
+            false, false, false
+        )
+    end
+end
+```
+
+## Vehicle Attachment
+
+### Attaching Vehicle to Lift
+
+```lua
+-- Attach vehicle to lift platform
+function LiftMain.attachVehicle(liftId, vehicle)
+    local lift = Lifts[liftId]
+    if not lift then return false end
+
+    if lift.vehicle then
+        Framework.Notify(locale('lift_occupied'), 'error')
+        return false
+    end
+
+    -- Position vehicle on lift
+    local platform = lift.parts[#lift.parts].entity
+    local platformCoords = GetEntityCoords(platform)
+
+    SetEntityCoords(vehicle, platformCoords.x, platformCoords.y, platformCoords.z + 0.5)
+    SetEntityHeading(vehicle, lift.heading)
+
+    -- Freeze vehicle
+    FreezeEntityPosition(vehicle, true)
+    SetVehicleOnGroundProperly(vehicle)
+
+    lift.vehicle = vehicle
+
+    return true
+end
+
+-- Update vehicle position during lift movement
+function LiftMain.updateVehiclePosition(liftId)
+    local lift = Lifts[liftId]
+    if not lift or not lift.vehicle then return end
+
+    local platform = lift.parts[#lift.parts].entity
+    local platformCoords = GetEntityCoords(platform)
+
+    SetEntityCoordsNoOffset(
+        lift.vehicle,
+        platformCoords.x,
+        platformCoords.y,
+        platformCoords.z + 0.5,
+        false, false, false
+    )
+end
+```
+
+### Detaching Vehicle
+
+```lua
+-- Detach vehicle from lift
+function LiftMain.detachVehicle(liftId)
+    local lift = Lifts[liftId]
+    if not lift or not lift.vehicle then return end
+
+    -- Unfreeze vehicle
+    FreezeEntityPosition(lift.vehicle, false)
+
+    -- If lift is raised, lower it first
+    if lift.height > 0.5 then
+        LiftMain.lower(liftId, 0.0)
+    end
+
+    lift.vehicle = nil
+end
+```
+
+## Remote Control
+
+### Control Events
+
+```lua
+-- Listen for lift control events
+RegisterNetEvent('mechanic:lifts:control', function(data)
+    local lift = Lifts[data.liftId]
+    if not lift then return end
+
+    if data.action == 'raise' then
+        LiftMain.raise(data.liftId, LiftConfig.MaxHeight)
+    elseif data.action == 'lower' then
+        LiftMain.lower(data.liftId, 0.0)
+    elseif data.action == 'stop' then
+        -- Stop current movement
+        lift.targetHeight = lift.height
+    end
+end)
+```
+
+### NUI Control Callbacks
+
+```lua
+-- Control lift from UI
+RegisterNUICallback('mechanic:lift:control', function(data, cb)
+    local result = lib.callback.await('mechanic:items:controlLift', false, {
+        liftId = data.liftId,
+        action = data.action,
+    })
+    cb(result)
+end)
+
+-- Get lift status
+RegisterNUICallback('mechanic:lift:getStatus', function(data, cb)
+    local lift = Lifts[data.liftId]
+    if not lift then
+        cb({ success = false })
+        return
+    end
+
+    cb({
+        success = true,
+        status = {
+            height = lift.height,
+            maxHeight = LiftConfig.MaxHeight,
+            hasVehicle = lift.vehicle ~= nil,
+            isMoving = lift.isMoving or false,
+        },
+    })
+end)
+```
+
+## Interaction Zones
+
+### Target Integration
+
+```lua
+-- Add interaction targets to lift
+function LiftMain.addTargets(liftId)
+    local lift = Lifts[liftId]
+    if not lift then return end
+
+    -- Control panel target
+    exports.ox_target:addLocalEntity(lift.parts[1].entity, {
+        {
+            name = 'lift_control_' .. liftId,
+            icon = 'fa-solid fa-up-down',
+            label = locale('lift_control'),
+            onSelect = function()
+                LiftMain.openControlUI(liftId)
+            end,
+            canInteract = function()
+                return TabletPermissions.canAccessLift(liftId)
+            end,
+        },
+        {
+            name = 'lift_attach_' .. liftId,
+            icon = 'fa-solid fa-car',
+            label = locale('lift_attach_vehicle'),
+            onSelect = function()
+                local vehicle = cache.vehicle
+                if vehicle then
+                    LiftMain.attachVehicle(liftId, vehicle)
+                end
+            end,
+            canInteract = function()
+                return cache.vehicle and not Lifts[liftId].vehicle
+            end,
+        },
+    })
+end
+```
+
+## Configuration
+
+```lua
+LiftConfig = {
+    -- Height settings
+    MaxHeight = 2.5,           -- Maximum lift height in meters
+    DefaultSpeed = 0.5,        -- Default movement speed
+
+    -- Sound settings
+    Sounds = {
+        start = { dict = 'DLC_GR_MOC_SOUNDS', name = 'LIFT_START' },
+        stop = { dict = 'DLC_GR_MOC_SOUNDS', name = 'LIFT_STOP' },
+        moving = { dict = 'DLC_GR_MOC_SOUNDS', name = 'LIFT_MOVE' },
+    },
+
+    -- Animation settings
+    AnimationSpeed = 30,       -- Frames per height unit
+
+    -- Part models
+    Parts = {
+        -- ... part definitions
+    },
+}
+```
+
+## Events
+
+```lua
+-- Lift raised event
+TriggerEvent('mechanic:lift:raised', { liftId = liftId, height = height })
+
+-- Lift lowered event
+TriggerEvent('mechanic:lift:lowered', { liftId = liftId, height = height })
+
+-- Vehicle attached event
+TriggerEvent('mechanic:lift:vehicleAttached', { liftId = liftId, vehicle = vehicle })
+
+-- Vehicle detached event
+TriggerEvent('mechanic:lift:vehicleDetached', { liftId = liftId })
+```

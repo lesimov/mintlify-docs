@@ -1,0 +1,474 @@
+---
+title: "Database Schema"
+description: "Complete database schema reference for dusa_mechanicv2 including all tables, columns, and relationships"
+---
+
+# Database Schema Reference
+
+This document provides the complete database schema for dusa_mechanicv2. All tables use the `ds_mechanic_` prefix and `utf8mb4_general_ci` collation.
+
+## Connection Details
+
+- **ORM**: oxmysql (MySQL.query.await, MySQL.insert.await, etc.)
+- **Collation**: utf8mb4_general_ci (NOT unicode)
+- **Engine**: InnoDB
+- **Auto-migration**: Enabled by default via MechanicConfig.Database.AutoMigration
+
+## Core Tables
+
+### ds_mechanic_shops
+
+Stores mechanic shop definitions and business data.
+
+```sql
+CREATE TABLE ds_mechanic_shops (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    owner_identifier VARCHAR(255) DEFAULT NULL,
+    owner_name VARCHAR(100) DEFAULT NULL,
+    job_name VARCHAR(64) DEFAULT NULL,
+    location JSON NOT NULL,
+    settings JSON DEFAULT NULL,
+    balance DECIMAL(15,2) DEFAULT 0.00,
+    is_active TINYINT(1) DEFAULT 1,
+    blip_enabled TINYINT(1) DEFAULT 1,
+    blip_sprite INT DEFAULT 446,
+    blip_color INT DEFAULT 47,
+    banner_url VARCHAR(512) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_shop_name (name),
+    INDEX idx_owner (owner_identifier),
+    INDEX idx_job_name (job_name),
+    INDEX idx_active (is_active)
+);
+```
+
+**Key columns:**
+- `job_name`: Framework job linked to this shop
+- `location`: JSON with x, y, z, heading
+- `settings`: Shop-specific settings (services enabled, custom prices)
+- `balance`: Shop safe balance for salary payments
+
+### ds_mechanic_employees
+
+Employee records with job grades and permissions.
+
+```sql
+CREATE TABLE ds_mechanic_employees (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    identifier VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100) DEFAULT NULL,
+    grade INT DEFAULT 0,
+    salary DECIMAL(10,2) DEFAULT 0.00,
+    permissions JSON DEFAULT NULL,
+    hired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    hired_by VARCHAR(255) DEFAULT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_shop_employee (shop_id, identifier),
+    INDEX idx_identifier (identifier),
+    INDEX idx_grade (grade),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+**Key columns:**
+- `grade`: Numeric grade (0-4), synced with framework job grades
+- `salary`: Per-payment-period salary amount
+- `display_name`: Cached player name for offline display
+
+### ds_mechanic_orders
+
+Unified work orders table (tuning, repair, maintenance).
+
+```sql
+CREATE TABLE ds_mechanic_orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    customer_identifier VARCHAR(255) NOT NULL,
+    customer_name VARCHAR(100) DEFAULT NULL,
+    vehicle_plate VARCHAR(16) NOT NULL,
+    vehicle_model VARCHAR(100) DEFAULT NULL,
+    order_type ENUM('repair', 'tune', 'maintenance', 'custom') DEFAULT 'repair',
+    status ENUM('pending', 'accepted', 'awaiting_approval', 'in_progress', 'completed', 'cancelled') DEFAULT 'pending',
+    description TEXT DEFAULT NULL,
+    assigned_to VARCHAR(255) DEFAULT NULL,
+    assigned_name VARCHAR(100) DEFAULT NULL,
+    total_cost DECIMAL(10,2) DEFAULT NULL,
+    rating TINYINT DEFAULT NULL,
+    rating_comment TEXT DEFAULT NULL,
+    customer_last_read_at TIMESTAMP NULL,
+    mechanic_last_read_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP NULL DEFAULT NULL,
+    
+    INDEX idx_shop (shop_id),
+    INDEX idx_customer (customer_identifier),
+    INDEX idx_plate (vehicle_plate),
+    INDEX idx_status (status),
+    INDEX idx_assigned (assigned_to),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+**Key columns:**
+- `status`: Order lifecycle state
+- `awaiting_approval`: Customer must approve price before work begins
+- `customer_last_read_at` / `mechanic_last_read_at`: Unread message tracking
+
+### ds_mechanic_order_items
+
+Individual items/mods within an order.
+
+```sql
+CREATE TABLE ds_mechanic_order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    item_type VARCHAR(32) NOT NULL,
+    mod_type INT DEFAULT NULL,
+    mod_index INT DEFAULT NULL,
+    mod_label VARCHAR(128) DEFAULT NULL,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    status ENUM('pending', 'applied', 'cancelled') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_order (order_id),
+    FOREIGN KEY (order_id) REFERENCES ds_mechanic_orders(id) ON DELETE CASCADE
+);
+```
+
+### ds_mechanic_zones
+
+Admin-created zones (tuning, repair, storage, shop_ped, repair_ped, craft_table).
+
+```sql
+CREATE TABLE ds_mechanic_zones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    zone_type ENUM('tuning', 'repair', 'lift', 'storage', 'shop_ped', 'repair_ped', 'craft_table') NOT NULL,
+    name VARCHAR(100) DEFAULT NULL,
+    coords JSON NOT NULL,
+    settings JSON DEFAULT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_by VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_shop (shop_id),
+    INDEX idx_type (zone_type),
+    INDEX idx_active (is_active),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+**Zone types:**
+- `tuning`: Vehicle tuning zone
+- `repair`: Manual repair zone
+- `storage`: ox_inventory stash zone
+- `shop_ped`: NPC shop interaction zone
+- `repair_ped`: Auto-repair NPC zone
+- `craft_table`: Crafting station zone
+
+### ds_mechanic_lifts
+
+Hydraulic lift configurations.
+
+```sql
+CREATE TABLE ds_mechanic_lifts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    name VARCHAR(100) DEFAULT NULL,
+    coords JSON NOT NULL,
+    rotation FLOAT DEFAULT 0.0,
+    model VARCHAR(64) DEFAULT 'prop_lift_jack_02',
+    settings JSON DEFAULT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_by VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_shop (shop_id),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+### ds_mechanic_service_history
+
+Completed service records log.
+
+```sql
+CREATE TABLE ds_mechanic_service_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    shop_id INT DEFAULT NULL,
+    order_id INT DEFAULT NULL,
+    service_type ENUM('repair', 'tune', 'nitro_refill', 'suspension', 'cosmetic', 'other') NOT NULL,
+    service_details JSON DEFAULT NULL,
+    cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    performed_by VARCHAR(255) NOT NULL,
+    mileage_at_service FLOAT DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_plate (plate),
+    INDEX idx_shop (shop_id),
+    INDEX idx_type (service_type),
+    INDEX idx_created (created_at)
+);
+```
+
+### ds_mechanic_vehicle_mods
+
+Saved vehicle modifications (persistence).
+
+```sql
+CREATE TABLE ds_mechanic_vehicle_mods (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    props JSON NOT NULL,
+    applied_by VARCHAR(64) DEFAULT NULL,
+    shop_id INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_plate (plate),
+    INDEX idx_shop_id (shop_id)
+);
+```
+
+### ds_mechanic_pending_vehicle_mods
+
+Pending mods for garage race condition prevention.
+
+```sql
+CREATE TABLE ds_mechanic_pending_vehicle_mods (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    mods JSON NOT NULL,
+    order_id INT DEFAULT NULL,
+    applied TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    applied_at TIMESTAMP NULL,
+    
+    UNIQUE KEY uk_plate (plate),
+    INDEX idx_applied (applied)
+);
+```
+
+### ds_mechanic_vehicle_stance
+
+Stance/camber/suspension settings.
+
+```sql
+CREATE TABLE ds_mechanic_vehicle_stance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    front_camber FLOAT DEFAULT 0.0,
+    rear_camber FLOAT DEFAULT 0.0,
+    front_track_width FLOAT DEFAULT 0.0,
+    rear_track_width FLOAT DEFAULT 0.0,
+    suspension_height FLOAT DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_plate (plate)
+);
+```
+
+### ds_mechanic_transactions
+
+Financial transaction log.
+
+```sql
+CREATE TABLE ds_mechanic_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shop_id INT NOT NULL,
+    transaction_type ENUM('income', 'expense', 'salary', 'refund', 'transfer') NOT NULL,
+    amount DECIMAL(15,2) NOT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    details JSON DEFAULT NULL,
+    reference_id INT DEFAULT NULL,
+    reference_type VARCHAR(32) DEFAULT NULL,
+    performed_by VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_shop (shop_id),
+    INDEX idx_type (transaction_type),
+    INDEX idx_created (created_at),
+    FOREIGN KEY (shop_id) REFERENCES ds_mechanic_shops(id) ON DELETE CASCADE
+);
+```
+
+## Illegal Network Tables
+
+### ds_mechanic_redline_profiles
+
+Underground reputation profiles.
+
+```sql
+CREATE TABLE ds_mechanic_redline_profiles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    identifier VARCHAR(255) NOT NULL,
+    alias VARCHAR(64) NOT NULL,
+    avatar_url VARCHAR(512) DEFAULT NULL,
+    reputation INT DEFAULT 0,
+    level INT DEFAULT 1,
+    completed_jobs INT DEFAULT 0,
+    total_earnings DECIMAL(15,2) DEFAULT 0.00,
+    specializations JSON DEFAULT NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_identifier (identifier),
+    UNIQUE KEY uk_alias (alias),
+    INDEX idx_level (level),
+    INDEX idx_reputation (reputation)
+);
+```
+
+### ds_mechanic_vehicle_heat
+
+Heat/wanted level tracking.
+
+```sql
+CREATE TABLE ds_mechanic_vehicle_heat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    identifier VARCHAR(255) NOT NULL,
+    heat_level INT DEFAULT 0,
+    last_activity VARCHAR(64) DEFAULT NULL,
+    decay_paused TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_identifier (identifier),
+    INDEX idx_heat (heat_level)
+);
+```
+
+### ds_mechanic_fake_plates
+
+Fake plate registry.
+
+```sql
+CREATE TABLE ds_mechanic_fake_plates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fake_plate VARCHAR(16) NOT NULL,
+    original_plate VARCHAR(16) NOT NULL,
+    vehicle_net_id INT DEFAULT NULL,
+    created_by VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    removed_at TIMESTAMP NULL,
+    is_active TINYINT(1) DEFAULT 1,
+    
+    UNIQUE KEY uk_fake_plate (fake_plate),
+    INDEX idx_original (original_plate),
+    INDEX idx_active (is_active)
+);
+```
+
+### ds_mechanic_modification_codes
+
+Modification code tracking for installed mods.
+
+```sql
+CREATE TABLE ds_mechanic_modification_codes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(32) NOT NULL,
+    plate VARCHAR(16) NOT NULL,
+    mod_type INT NOT NULL,
+    mod_index INT NOT NULL,
+    shop_id INT DEFAULT NULL,
+    applied_by VARCHAR(255) NOT NULL,
+    price DECIMAL(10,2) DEFAULT 0.00,
+    is_legal TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE KEY uk_code (code),
+    INDEX idx_plate (plate),
+    INDEX idx_shop (shop_id)
+);
+```
+
+## Migration System
+
+Migrations are stored in `sql/migrations/` and tracked in `ds_mechanic_migrations` table.
+
+### Running Migrations
+
+```lua
+-- Auto-run on startup if enabled
+MechanicConfig.Database.AutoMigration = true
+
+-- Manual trigger
+exports.dusa_mechanicv2:runMigrations()
+
+-- Check status
+local status = exports.dusa_mechanicv2:getMigrationStatus()
+-- Returns: { applied = {...}, pending = {...} }
+```
+
+### Migration File Format
+
+```sql
+-- Migration: NNN_description
+-- Description: What this migration does
+
+ALTER TABLE ds_mechanic_table
+ADD COLUMN new_column VARCHAR(64) DEFAULT NULL;
+```
+
+## Common Query Patterns
+
+### Get shop employees
+
+```lua
+local employees = MySQL.query.await([[
+    SELECT * FROM ds_mechanic_employees
+    WHERE shop_id = ? AND is_active = 1
+    ORDER BY grade DESC, hired_at ASC
+]], { shopId })
+```
+
+### Get orders with pagination
+
+```lua
+local orders = MySQL.query.await([[
+    SELECT o.*, e.display_name as mechanic_name
+    FROM ds_mechanic_orders o
+    LEFT JOIN ds_mechanic_employees e ON o.assigned_to = e.identifier AND e.shop_id = o.shop_id
+    WHERE o.shop_id = ? AND o.status = ?
+    ORDER BY o.created_at DESC
+    LIMIT ? OFFSET ?
+]], { shopId, status, limit, offset })
+```
+
+### Insert with returning ID
+
+```lua
+local orderId = MySQL.insert.await([[
+    INSERT INTO ds_mechanic_orders (shop_id, customer_identifier, vehicle_plate, order_type)
+    VALUES (?, ?, ?, ?)
+]], { shopId, customerId, plate, 'tune' })
+```
+
+### Transaction for multi-table operations
+
+```lua
+MySQL.transaction.await({
+    {
+        query = 'UPDATE ds_mechanic_shops SET balance = balance - ? WHERE id = ?',
+        values = { amount, shopId }
+    },
+    {
+        query = 'INSERT INTO ds_mechanic_transactions (shop_id, transaction_type, amount, description) VALUES (?, ?, ?, ?)',
+        values = { shopId, 'salary', amount, 'Salary payment' }
+    }
+})
+```

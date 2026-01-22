@@ -1,0 +1,355 @@
+---
+title: "Tablet Integration"
+description: "Client-side tablet UI integration and NUI callback handlers"
+---
+
+# Tablet Integration
+
+The tablet integration module bridges the React UI with the FiveM client and server, handling NUI callbacks and event communication.
+
+## Overview
+
+The tablet runs inside `dusa_tablet` as a registered app. This module handles:
+
+1. App registration with dusa_tablet
+2. NUI callback routing to server
+3. Client-side event handling
+4. UI state management
+
+## App Registration
+
+```lua
+-- Register mechanic app with tablet
+CreateThread(function()
+    Wait(1000) -- Wait for dusa_tablet to load
+
+    exports.dusa_tablet:RegisterApp({
+        id = 'mechanic',
+        name = 'Mechanic',
+        icon = 'wrench',
+        resource = 'dusa_mechanicv2',
+        description = 'Vehicle tuning and repair management',
+        permissions = { 'mechanic' }, -- Required jobs
+    })
+end)
+```
+
+## NUI Callback Pattern
+
+All NUI callbacks follow this pattern:
+
+```lua
+-- Register NUI callback
+RegisterNUICallback('mechanic:getOrders', function(data, cb)
+    -- Call server callback
+    local result = lib.callback.await('mechanic:tablet:getOrders', false, data)
+    cb(result)
+end)
+```
+
+### Common Callbacks
+
+```lua
+-- Orders
+RegisterNUICallback('mechanic:getOrders', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:getOrders', false, data)
+    cb(result)
+end)
+
+RegisterNUICallback('mechanic:createOrder', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:createOrder', false, data)
+    cb(result)
+end)
+
+RegisterNUICallback('mechanic:updateOrder', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:updateOrder', false, data)
+    cb(result)
+end)
+
+-- Employees
+RegisterNUICallback('mechanic:getEmployees', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:getEmployees', false, data)
+    cb(result)
+end)
+
+RegisterNUICallback('mechanic:hireEmployee', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:hireEmployee', false, data)
+    cb(result)
+end)
+
+-- Shop
+RegisterNUICallback('mechanic:getShopInfo', function(data, cb)
+    local result = lib.callback.await('mechanic:tablet:getShopInfo', false, data)
+    cb(result)
+end)
+
+-- Tuning
+RegisterNUICallback('mechanic:getTuningOptions', function(data, cb)
+    local result = lib.callback.await('mechanic:tuning:getOptions', false, data)
+    cb(result)
+end)
+
+RegisterNUICallback('mechanic:purchaseMods', function(data, cb)
+    local result = lib.callback.await('mechanic:tuning:purchase', false, data)
+    cb(result)
+end)
+```
+
+## Locale System
+
+The tablet integration provides locale strings to the React UI:
+
+```lua
+-- TuningLocales module (loaded before tablet_integration)
+TuningLocales = {}
+
+function TuningLocales.getAll()
+    return {
+        -- General
+        ['tuning.title'] = locale('tuning_title'),
+        ['tuning.preview'] = locale('tuning_preview'),
+        ['tuning.apply'] = locale('tuning_apply'),
+        ['tuning.cancel'] = locale('tuning_cancel'),
+        ['tuning.total'] = locale('tuning_total'),
+
+        -- Categories
+        ['tuning.category.engine'] = locale('category_engine'),
+        ['tuning.category.brakes'] = locale('category_brakes'),
+        ['tuning.category.transmission'] = locale('category_transmission'),
+        ['tuning.category.suspension'] = locale('category_suspension'),
+        ['tuning.category.armor'] = locale('category_armor'),
+        ['tuning.category.exterior'] = locale('category_exterior'),
+        ['tuning.category.wheels'] = locale('category_wheels'),
+        ['tuning.category.lights'] = locale('category_lights'),
+
+        -- Messages
+        ['tuning.success'] = locale('tuning_success'),
+        ['tuning.error'] = locale('tuning_error'),
+        ['tuning.insufficient_funds'] = locale('insufficient_funds'),
+    }
+end
+
+-- NUI callback for locales
+RegisterNUICallback('mechanic:getLocales', function(data, cb)
+    local locales = {
+        tuning = TuningLocales.getAll(),
+        repair = RepairLocales.getAll(),
+        -- ... other locale modules
+    }
+    cb(locales)
+end)
+```
+
+## Event Handlers
+
+### Receiving Server Events
+
+```lua
+-- Order updated
+RegisterNetEvent('mechanic:tablet:orderUpdated', function(data)
+    SendNUIMessage({
+        type = 'ORDER_UPDATED',
+        payload = data,
+    })
+end)
+
+-- Employee status changed
+RegisterNetEvent('mechanic:tablet:employeeUpdated', function(data)
+    SendNUIMessage({
+        type = 'EMPLOYEE_UPDATED',
+        payload = data,
+    })
+end)
+
+-- Shop settings changed
+RegisterNetEvent('mechanic:tablet:shopUpdated', function(data)
+    SendNUIMessage({
+        type = 'SHOP_UPDATED',
+        payload = data,
+    })
+end)
+
+-- Notification from server
+RegisterNetEvent('mechanic:tablet:notify', function(data)
+    SendNUIMessage({
+        type = 'NOTIFICATION',
+        payload = data,
+    })
+end)
+```
+
+### UI State Events
+
+```lua
+-- Tab opened
+RegisterNetEvent('mechanic:tablet:tabOpened', function(tabId)
+    ClientDebug.debug('TABLET', 'Tab opened: ' .. tabId)
+
+    -- Initialize tab-specific state
+    if tabId == 'tuning' then
+        InitializeTuningTab()
+    elseif tabId == 'orders' then
+        RefreshOrders()
+    end
+end)
+
+-- Tab closed
+RegisterNetEvent('mechanic:tablet:tabClosed', function(tabId)
+    ClientDebug.debug('TABLET', 'Tab closed: ' .. tabId)
+
+    -- Cleanup tab-specific state
+    if tabId == 'tuning' then
+        CleanupTuningPreview()
+    end
+end)
+```
+
+## Vehicle Context
+
+### Getting Current Vehicle
+
+```lua
+-- Provide vehicle context to UI
+RegisterNUICallback('mechanic:getVehicleContext', function(data, cb)
+    local vehicle = cache.vehicle
+
+    if not vehicle then
+        cb({ success = false, error = 'Not in vehicle' })
+        return
+    end
+
+    local props = lib.getVehicleProperties(vehicle)
+    local plate = GetVehicleNumberPlateText(vehicle)
+    local model = GetEntityModel(vehicle)
+    local modelName = GetDisplayNameFromVehicleModel(model)
+
+    cb({
+        success = true,
+        vehicle = {
+            netId = NetworkGetNetworkIdFromEntity(vehicle),
+            plate = plate,
+            model = model,
+            modelName = modelName,
+            currentMods = props.mods,
+        },
+    })
+end)
+```
+
+### Vehicle Mod Preview
+
+```lua
+-- Preview mod without applying
+RegisterNUICallback('mechanic:previewMod', function(data, cb)
+    local vehicle = cache.vehicle
+    if not vehicle then
+        cb({ success = false })
+        return
+    end
+
+    -- Store original value for rollback
+    TuningPreview.storeOriginal(vehicle, data.modType)
+
+    -- Apply preview
+    SetVehicleMod(vehicle, data.modType, data.modIndex, false)
+
+    cb({ success = true })
+end)
+
+-- Reset preview
+RegisterNUICallback('mechanic:resetPreview', function(data, cb)
+    local vehicle = cache.vehicle
+    if not vehicle then
+        cb({ success = false })
+        return
+    end
+
+    TuningPreview.restoreAll(vehicle)
+
+    cb({ success = true })
+end)
+```
+
+## Admin UI Exports
+
+```lua
+-- Open admin UI
+exports('openAdminUI', function(options)
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        type = 'OPEN_ADMIN_UI',
+        payload = options or {},
+    })
+end)
+
+-- Close admin UI
+exports('closeAdminUI', function()
+    SetNuiFocus(false, false)
+    SendNUIMessage({
+        type = 'CLOSE_ADMIN_UI',
+    })
+end)
+
+-- Check if admin UI is open
+exports('isAdminUIOpen', function()
+    return AdminUIState.isOpen
+end)
+```
+
+## NUI Focus Management
+
+```lua
+-- Handle NUI focus
+RegisterNUICallback('mechanic:setFocus', function(data, cb)
+    SetNuiFocus(data.hasFocus, data.hasCursor)
+    cb({ success = true })
+end)
+
+-- Close UI on escape
+RegisterNUICallback('mechanic:close', function(data, cb)
+    SetNuiFocus(false, false)
+    cb({ success = true })
+end)
+```
+
+## Debug Integration
+
+```lua
+-- Debug panel data
+RegisterNUICallback('mechanic:getDebugData', function(data, cb)
+    cb({
+        debugLevel = ClientDebug.getLevel(),
+        categories = ClientDebug.getCategories(),
+        logs = ClientDebug.getRecentLogs(100),
+    })
+end)
+
+-- Toggle debug category
+RegisterNUICallback('mechanic:toggleDebugCategory', function(data, cb)
+    ClientDebug.toggleCategory(data.category)
+    cb({ success = true })
+end)
+```
+
+## React Communication (TypeScript)
+
+On the React side:
+
+```typescript
+// Fetch data from server via NUI
+async function getOrders(page: number) {
+  const response = await postNui('mechanic:getOrders', { page });
+  return response;
+}
+
+// Listen for server events
+useNuiEvent('ORDER_UPDATED', (data) => {
+  // Update local state
+  queryClient.invalidateQueries(['orders']);
+});
+
+// Get locales
+const { data: locales } = useQuery(['locales'], () =>
+  postNui('mechanic:getLocales', {})
+);
+```

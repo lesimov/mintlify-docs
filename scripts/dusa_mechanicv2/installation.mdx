@@ -1,0 +1,70 @@
+---
+title: "Installation"
+description: "Dusa Mechanic V2 kurulum rehberi"
+---
+
+# Kurulum
+
+## Adım 1: Bağımlılıkları Yükleyin
+
+Aşağıdaki kaynakların sunucunuzda kurulu ve başlatılmış olduğundan emin olun:
+
+```bash
+ensure ox_lib
+ensure oxmysql
+ensure dusa_bridge
+ensure dusa_tablet
+```
+
+## Adım 2: Kaynağı Ekleyin
+
+`dusa_mechanicv2` klasörünü `resources` dizininize kopyalayın.
+
+## Adım 3: Server.cfg Yapılandırması
+
+```cfg
+ensure dusa_mechanicv2
+```
+
+## Adım 4: Veritabanı Migrasyonu
+
+Kaynak ilk başlatıldığında otomatik olarak veritabanı tablolarını oluşturur.
+
+<Note>
+`MechanicConfig.Database.AutoMigration = true` varsayılan olarak etkindir. Manuel migrasyon için `false` yapabilirsiniz.
+</Note>
+
+## Adım 5: Dil Ayarı
+
+`shared/config.lua` dosyasında varsayılan dili ayarlayın:
+
+```lua
+MechanicConfig.Locale = {
+    Default = 'tr', -- veya 'en'
+}
+```
+
+## Doğrulama
+
+Kurulum başarılıysa konsol çıktısı:
+
+```
+[dusa_mechanicv2] Database migration complete
+[dusa_mechanicv2] server/tuning/main.lua loaded successfully
+```
+
+## Sorun Giderme
+
+### Veritabanı Hataları
+
+```bash
+mechanic_db_status     # Veritabanı durumunu kontrol et
+mechanic_health_check  # Eksik tabloları kontrol et
+mechanic_health_repair # Eksik tabloları onar
+```
+
+### Collation Sorunları
+
+```bash
+mechanic_fix_collation # Collation uyumsuzluklarını düzelt
+```

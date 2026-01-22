@@ -1,0 +1,497 @@
+---
+title: "Tuning System (Client)"
+description: "Client-side vehicle tuning with cinematic camera, mod preview, and behaviors"
+---
+
+# Client Tuning System
+
+The client-side tuning system provides an immersive vehicle modification experience with cinematic cameras, real-time previews, and smooth transitions.
+
+## Overview
+
+The client tuning module includes:
+
+1. **Camera System** - Cinematic camera with presets and transitions
+2. **Mod Preview** - Real-time modification preview
+3. **Behaviors** - Input handling and UI state
+4. **Zone Detection** - Tuning zone entry/exit
+
+## Camera System
+
+### Camera Presets
+
+```lua
+-- Camera preset definitions
+TuningCamera.Presets = {
+    front = {
+        offset = vector3(4.0, 0.0, 1.0),
+        rotation = vector3(-5.0, 0.0, 180.0),
+        fov = 50.0,
+    },
+    rear = {
+        offset = vector3(-4.0, 0.0, 1.0),
+        rotation = vector3(-5.0, 0.0, 0.0),
+        fov = 50.0,
+    },
+    left = {
+        offset = vector3(0.0, -4.0, 1.0),
+        rotation = vector3(-5.0, 0.0, 90.0),
+        fov = 50.0,
+    },
+    right = {
+        offset = vector3(0.0, 4.0, 1.0),
+        rotation = vector3(-5.0, 0.0, -90.0),
+        fov = 50.0,
+    },
+    wheel_front_left = {
+        offset = vector3(1.5, -1.5, 0.3),
+        rotation = vector3(-10.0, 0.0, 135.0),
+        fov = 40.0,
+    },
+    wheel_front_right = {
+        offset = vector3(1.5, 1.5, 0.3),
+        rotation = vector3(-10.0, 0.0, -135.0),
+        fov = 40.0,
+    },
+    engine = {
+        offset = vector3(2.0, 0.0, 1.5),
+        rotation = vector3(-30.0, 0.0, 180.0),
+        fov = 45.0,
+    },
+    interior = {
+        offset = vector3(0.0, 0.0, 1.0),
+        rotation = vector3(-20.0, 0.0, 0.0),
+        fov = 60.0,
+    },
+}
+```
+
+### Camera Control
+
+```lua
+-- Initialize camera for tuning
+function TuningCamera.start(vehicle)
+    if TuningCamera.active then return end
+
+    TuningCamera.vehicle = vehicle
+    TuningCamera.active = true
+
+    -- Create camera
+    TuningCamera.cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+
+    -- Set initial position
+    TuningCamera.setPreset('front')
+
+    -- Render camera
+    SetCamActive(TuningCamera.cam, true)
+    RenderScriptCams(true, true, 1000, true, true)
+
+    -- Freeze player
+    FreezeEntityPosition(cache.ped, true)
+    SetEntityVisible(cache.ped, false, false)
+end
+
+-- Set camera to preset
+function TuningCamera.setPreset(presetName, transition)
+    local preset = TuningCamera.Presets[presetName]
+    if not preset then return end
+
+    local vehicleCoords = GetEntityCoords(TuningCamera.vehicle)
+    local vehicleHeading = GetEntityHeading(TuningCamera.vehicle)
+
+    -- Calculate world position
+    local camPos = GetOffsetFromEntityInWorldCoords(
+        TuningCamera.vehicle,
+        preset.offset.x, preset.offset.y, preset.offset.z
+    )
+
+    -- Apply with transition
+    if transition then
+        SetCamParams(
+            TuningCamera.cam,
+            camPos.x, camPos.y, camPos.z,
+            preset.rotation.x,
+            preset.rotation.y,
+            vehicleHeading + preset.rotation.z,
+            preset.fov,
+            transition.duration or 1000,
+            transition.easeIn or 1,
+            transition.easeOut or 1
+        )
+    else
+        SetCamCoord(TuningCamera.cam, camPos.x, camPos.y, camPos.z)
+        SetCamRot(TuningCamera.cam,
+            preset.rotation.x,
+            preset.rotation.y,
+            vehicleHeading + preset.rotation.z,
+            2
+        )
+        SetCamFov(TuningCamera.cam, preset.fov)
+    end
+
+    TuningCamera.currentPreset = presetName
+end
+
+-- Stop camera
+function TuningCamera.stop()
+    if not TuningCamera.active then return end
+
+    RenderScriptCams(false, true, 1000, true, true)
+    DestroyCam(TuningCamera.cam, false)
+
+    FreezeEntityPosition(cache.ped, false)
+    SetEntityVisible(cache.ped, true, false)
+
+    TuningCamera.active = false
+    TuningCamera.cam = nil
+end
+```
+
+### Swipe Controls
+
+```lua
+-- Handle swipe gestures for camera rotation
+function TuningCamera.handleSwipe(direction)
+    local presetOrder = { 'front', 'right', 'rear', 'left' }
+    local currentIndex = table.indexOf(presetOrder, TuningCamera.currentPreset) or 1
+
+    if direction == 'left' then
+        currentIndex = currentIndex + 1
+        if currentIndex > #presetOrder then currentIndex = 1 end
+    elseif direction == 'right' then
+        currentIndex = currentIndex - 1
+        if currentIndex < 1 then currentIndex = #presetOrder end
+    end
+
+    TuningCamera.setPreset(presetOrder[currentIndex], {
+        duration = 500,
+        easeIn = 1,
+        easeOut = 1,
+    })
+end
+
+-- NUI callback for swipe
+RegisterNUICallback('mechanic:cameraSwipe', function(data, cb)
+    TuningCamera.handleSwipe(data.direction)
+    cb({ success = true, preset = TuningCamera.currentPreset })
+end)
+```
+
+## Mod Preview System
+
+### Preview State
+
+```lua
+TuningPreview = {
+    active = false,
+    vehicle = nil,
+    originalMods = {},
+    previewedMods = {},
+}
+```
+
+### Storing Original Values
+
+```lua
+-- Store original mod value before preview
+function TuningPreview.storeOriginal(vehicle, modType)
+    if TuningPreview.originalMods[modType] ~= nil then
+        return -- Already stored
+    end
+
+    local currentIndex = GetVehicleMod(vehicle, modType)
+    TuningPreview.originalMods[modType] = currentIndex
+end
+
+-- Store all mods
+function TuningPreview.storeAllOriginals(vehicle)
+    for modType = 0, 49 do
+        local modCount = GetNumVehicleMods(vehicle, modType)
+        if modCount > 0 then
+            TuningPreview.originalMods[modType] = GetVehicleMod(vehicle, modType)
+        end
+    end
+
+    -- Store colors
+    local primary, secondary = GetVehicleColours(vehicle)
+    TuningPreview.originalMods['primaryColor'] = primary
+    TuningPreview.originalMods['secondaryColor'] = secondary
+
+    -- Store wheel type
+    TuningPreview.originalMods['wheelType'] = GetVehicleWheelType(vehicle)
+end
+```
+
+### Applying Preview
+
+```lua
+-- Preview a modification
+function TuningPreview.apply(vehicle, modType, modIndex)
+    TuningPreview.storeOriginal(vehicle, modType)
+
+    SetVehicleMod(vehicle, modType, modIndex, false)
+    TuningPreview.previewedMods[modType] = modIndex
+
+    -- Play preview sound
+    PlaySoundFrontend(-1, 'NAV_UP_DOWN', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
+end
+
+-- Preview color
+function TuningPreview.applyColor(vehicle, colorType, colorIndex)
+    local primary, secondary = GetVehicleColours(vehicle)
+
+    if colorType == 'primary' then
+        TuningPreview.storeOriginal(vehicle, 'primaryColor')
+        SetVehicleColours(vehicle, colorIndex, secondary)
+    else
+        TuningPreview.storeOriginal(vehicle, 'secondaryColor')
+        SetVehicleColours(vehicle, primary, colorIndex)
+    end
+end
+
+-- Preview wheel type
+function TuningPreview.applyWheelType(vehicle, wheelType, wheelIndex)
+    TuningPreview.storeOriginal(vehicle, 'wheelType')
+
+    SetVehicleWheelType(vehicle, wheelType)
+    SetVehicleMod(vehicle, 23, wheelIndex, false)
+end
+```
+
+### Restoring Original Values
+
+```lua
+-- Restore single mod
+function TuningPreview.restore(vehicle, modType)
+    local original = TuningPreview.originalMods[modType]
+    if original == nil then return end
+
+    if modType == 'primaryColor' then
+        local _, secondary = GetVehicleColours(vehicle)
+        SetVehicleColours(vehicle, original, secondary)
+    elseif modType == 'secondaryColor' then
+        local primary, _ = GetVehicleColours(vehicle)
+        SetVehicleColours(vehicle, primary, original)
+    elseif modType == 'wheelType' then
+        SetVehicleWheelType(vehicle, original)
+    else
+        SetVehicleMod(vehicle, modType, original, false)
+    end
+
+    TuningPreview.previewedMods[modType] = nil
+end
+
+-- Restore all previewed mods
+function TuningPreview.restoreAll(vehicle)
+    for modType, originalIndex in pairs(TuningPreview.originalMods) do
+        TuningPreview.restore(vehicle, modType)
+    end
+
+    TuningPreview.originalMods = {}
+    TuningPreview.previewedMods = {}
+end
+```
+
+## Behaviors and Input
+
+### Key Bindings
+
+```lua
+-- Tuning mode controls
+TuningBehaviors = {
+    active = false,
+    keybinds = {},
+}
+
+function TuningBehaviors.start()
+    TuningBehaviors.active = true
+
+    -- Register keybinds
+    TuningBehaviors.keybinds.exit = lib.addKeybind({
+        name = 'tuning_exit',
+        description = 'Exit Tuning Mode',
+        defaultKey = 'ESCAPE',
+        onPressed = function()
+            TuningBehaviors.exit()
+        end,
+    })
+
+    TuningBehaviors.keybinds.rotateLeft = lib.addKeybind({
+        name = 'tuning_rotate_left',
+        description = 'Rotate Camera Left',
+        defaultKey = 'A',
+        onPressed = function()
+            TuningCamera.handleSwipe('left')
+        end,
+    })
+
+    TuningBehaviors.keybinds.rotateRight = lib.addKeybind({
+        name = 'tuning_rotate_right',
+        description = 'Rotate Camera Right',
+        defaultKey = 'D',
+        onPressed = function()
+            TuningCamera.handleSwipe('right')
+        end,
+    })
+end
+
+function TuningBehaviors.stop()
+    TuningBehaviors.active = false
+
+    -- Remove keybinds
+    for _, keybind in pairs(TuningBehaviors.keybinds) do
+        keybind:remove()
+    end
+    TuningBehaviors.keybinds = {}
+end
+
+function TuningBehaviors.exit()
+    -- Restore preview
+    TuningPreview.restoreAll(TuningPreview.vehicle)
+
+    -- Stop camera
+    TuningCamera.stop()
+
+    -- Stop behaviors
+    TuningBehaviors.stop()
+
+    -- Notify UI
+    SendNUIMessage({
+        type = 'TUNING_EXITED',
+    })
+end
+```
+
+## Zone Detection
+
+### Entering Tuning Zone
+
+```lua
+-- Zone entry handler
+function TuningZones.onEnter(zone)
+    if not TabletPermissions.canAccessTuning() then
+        return
+    end
+
+    -- Show interaction prompt
+    lib.showTextUI('[E] - ' .. locale('open_tuning'))
+
+    TuningZones.currentZone = zone
+
+    -- Wait for interaction
+    CreateThread(function()
+        while TuningZones.currentZone == zone do
+            Wait(0)
+
+            if IsControlJustReleased(0, 38) then -- E key
+                TuningZones.startTuning(zone)
+            end
+        end
+    end)
+end
+
+-- Zone exit handler
+function TuningZones.onExit(zone)
+    lib.hideTextUI()
+    TuningZones.currentZone = nil
+
+    -- If tuning active, exit
+    if TuningCamera.active then
+        TuningBehaviors.exit()
+    end
+end
+
+-- Start tuning session
+function TuningZones.startTuning(zone)
+    local vehicle = cache.vehicle
+
+    if not vehicle then
+        Framework.Notify(locale('must_be_in_vehicle'), 'error')
+        return
+    end
+
+    -- Initialize systems
+    TuningPreview.vehicle = vehicle
+    TuningPreview.storeAllOriginals(vehicle)
+    TuningCamera.start(vehicle)
+    TuningBehaviors.start()
+
+    -- Open UI
+    SendNUIMessage({
+        type = 'OPEN_TUNING',
+        payload = {
+            zoneId = zone.id,
+            vehicle = {
+                model = GetEntityModel(vehicle),
+                plate = GetVehicleNumberPlateText(vehicle),
+            },
+        },
+    })
+end
+```
+
+## NUI Callbacks
+
+```lua
+-- Get available mods for vehicle
+RegisterNUICallback('mechanic:getAvailableMods', function(data, cb)
+    local vehicle = TuningPreview.vehicle
+    if not vehicle then
+        cb({ success = false })
+        return
+    end
+
+    local mods = {}
+
+    for modType = 0, 49 do
+        local modCount = GetNumVehicleMods(vehicle, modType)
+        if modCount > 0 then
+            local options = {}
+            for i = -1, modCount - 1 do
+                table.insert(options, {
+                    index = i,
+                    label = GetModSlotName(vehicle, modType) or ('Level ' .. (i + 2)),
+                })
+            end
+
+            mods[modType] = {
+                type = modType,
+                current = GetVehicleMod(vehicle, modType),
+                options = options,
+            }
+        end
+    end
+
+    cb({ success = true, mods = mods })
+end)
+
+-- Apply preview
+RegisterNUICallback('mechanic:applyPreview', function(data, cb)
+    TuningPreview.apply(TuningPreview.vehicle, data.modType, data.modIndex)
+    cb({ success = true })
+end)
+
+-- Confirm purchase
+RegisterNUICallback('mechanic:confirmPurchase', function(data, cb)
+    -- Request server validation and purchase
+    local result = lib.callback.await('mechanic:tuning:purchase', false, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(TuningPreview.vehicle),
+        mods = data.mods,
+        totalPrice = data.totalPrice,
+    })
+
+    if result.success then
+        -- Clear preview state (mods are now permanent)
+        TuningPreview.originalMods = {}
+        TuningPreview.previewedMods = {}
+    end
+
+    cb(result)
+end)
+
+-- Cancel and exit
+RegisterNUICallback('mechanic:cancelTuning', function(data, cb)
+    TuningBehaviors.exit()
+    cb({ success = true })
+end)
+```

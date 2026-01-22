@@ -1,0 +1,433 @@
+---
+title: "Craft System"
+description: "Server-side crafting system for fake plates, nitro, and custom items"
+---
+
+# Craft System
+
+The craft system enables players to create items like fake plates and nitro kits through a recipe-based crafting interface.
+
+## Overview
+
+The craft system consists of five main components:
+
+1. **Recipes** - Recipe loading and validation from JSON
+2. **Execution** - Crafting process and skill checks
+3. **Callbacks** - Client-server communication
+4. **Fake Plates** - Fake license plate creation
+5. **Nitro System** - Nitro kit crafting and application
+
+## Recipe System
+
+### Recipe Configuration
+
+Recipes are defined in `config/craft_recipes.json`:
+
+```json
+{
+    "fake_plate": {
+        "id": "fake_plate",
+        "label": "Fake License Plate",
+        "description": "Create a fake license plate",
+        "category": "illegal",
+        "craftTime": 15000,
+        "skillCheck": {
+            "enabled": true,
+            "difficulty": "medium",
+            "keys": ["w", "a", "s", "d"]
+        },
+        "ingredients": [
+            { "item": "metalscrap", "count": 5 },
+            { "item": "plastic", "count": 3 },
+            { "item": "electronickit", "count": 1 }
+        ],
+        "result": {
+            "item": "fake_plate",
+            "count": 1,
+            "metadata": {}
+        },
+        "requiredJob": null,
+        "requiredZone": "craft_zone"
+    }
+}
+```
+
+### Recipe Loading
+
+```lua
+-- Load recipes on resource start
+CraftRecipes.load()
+
+-- Recipe structure in Lua
+local recipes = {
+    ['fake_plate'] = {
+        id = 'fake_plate',
+        label = 'Fake License Plate',
+        ingredients = {
+            { item = 'metalscrap', count = 5 },
+            { item = 'plastic', count = 3 },
+            { item = 'electronickit', count = 1 },
+        },
+        result = { item = 'fake_plate', count = 1 },
+        craftTime = 15000,
+        skillCheck = { enabled = true, difficulty = 'medium' },
+    },
+}
+```
+
+### Recipe Validation
+
+```lua
+-- Validate recipe exists and player has ingredients
+function CraftRecipes.canCraft(source, recipeId)
+    local recipe = CraftRecipes.get(recipeId)
+    if not recipe then return false, 'Recipe not found' end
+
+    -- Check ingredients
+    for _, ingredient in ipairs(recipe.ingredients) do
+        if not Framework.HasItem(source, ingredient.item, ingredient.count) then
+            return false, 'Missing: ' .. ingredient.item
+        end
+    end
+
+    return true
+end
+```
+
+## Craft Execution
+
+### Crafting Flow
+
+```lua
+lib.callback.register('mechanic:craft:start', function(source, data)
+    local recipe = CraftRecipes.get(data.recipeId)
+    if not recipe then
+        return { success = false, error = 'Invalid recipe' }
+    end
+
+    -- Validate ingredients
+    local canCraft, error = CraftRecipes.canCraft(source, data.recipeId)
+    if not canCraft then
+        return { success = false, error = error }
+    end
+
+    -- Check zone requirement
+    if recipe.requiredZone then
+        if not CraftZones.isPlayerInZone(source, recipe.requiredZone) then
+            return { success = false, error = 'Not in craft zone' }
+        end
+    end
+
+    -- Remove ingredients
+    for _, ingredient in ipairs(recipe.ingredients) do
+        Framework.RemoveItem(source, ingredient.item, ingredient.count)
+    end
+
+    -- Return craft info for client-side progress
+    return {
+        success = true,
+        craftTime = recipe.craftTime,
+        skillCheck = recipe.skillCheck,
+        recipeId = recipe.id,
+    }
+end)
+```
+
+### Craft Completion
+
+```lua
+lib.callback.register('mechanic:craft:complete', function(source, data)
+    local recipe = CraftRecipes.get(data.recipeId)
+    if not recipe then return { success = false } end
+
+    -- Verify skill check was passed (if required)
+    if recipe.skillCheck.enabled and not data.skillCheckPassed then
+        -- Refund partial ingredients on failure
+        CraftRecipes.refundPartial(source, recipe, 0.5)
+        return { success = false, error = 'Skill check failed' }
+    end
+
+    -- Give result item with metadata
+    local metadata = CraftExecution.generateMetadata(recipe, source)
+    Framework.AddItem(source, recipe.result.item, recipe.result.count, metadata)
+
+    -- Log craft
+    CraftExecution.logCraft(source, recipe)
+
+    return {
+        success = true,
+        item = recipe.result.item,
+        count = recipe.result.count,
+    }
+end)
+```
+
+## Fake Plate System
+
+### Creating Fake Plates
+
+```lua
+-- Fake plate crafting with custom text
+lib.callback.register('mechanic:craft:fakePlate', function(source, data)
+    local canCraft, error = CraftRecipes.canCraft(source, 'fake_plate')
+    if not canCraft then
+        return { success = false, error = error }
+    end
+
+    -- Validate plate text
+    local plateText = FakePlate.sanitizePlateText(data.plateText)
+    if not plateText then
+        return { success = false, error = 'Invalid plate text' }
+    end
+
+    -- Check if plate already exists
+    if FakePlate.plateExists(plateText) then
+        return { success = false, error = 'Plate already exists' }
+    end
+
+    -- Remove ingredients
+    CraftRecipes.removeIngredients(source, 'fake_plate')
+
+    -- Create fake plate item with metadata
+    local metadata = {
+        plateText = plateText,
+        createdBy = Framework.GetPlayer(source).Identifier,
+        createdAt = os.time(),
+        isIllegal = true,
+    }
+
+    Framework.AddItem(source, 'fake_plate', 1, metadata)
+
+    return { success = true, plateText = plateText }
+end)
+```
+
+### Applying Fake Plates
+
+```lua
+-- Apply fake plate to vehicle
+lib.callback.register('mechanic:fakePlate:apply', function(source, data)
+    -- Validate player has the fake plate
+    local item = Framework.GetItemBySlot(source, data.slot)
+    if not item or item.name ~= 'fake_plate' then
+        return { success = false, error = 'Invalid item' }
+    end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Vehicle not found' }
+    end
+
+    -- Store original plate
+    local originalPlate = GetVehicleNumberPlateText(vehicle)
+    FakePlate.storeOriginal(vehicle, originalPlate)
+
+    -- Apply fake plate
+    SetVehicleNumberPlateText(vehicle, item.metadata.plateText)
+
+    -- Remove item
+    Framework.RemoveItem(source, 'fake_plate', 1, data.slot)
+
+    -- Add heat for illegal activity
+    TriggerEvent('mechanic:illegal:addHeat', source, 'fake_plate_applied', 15)
+
+    return { success = true }
+end)
+```
+
+### Detecting Fake Plates
+
+```lua
+-- Police can check for fake plates
+lib.callback.register('mechanic:fakePlate:check', function(source, data)
+    local player = Framework.GetPlayer(source)
+    if player.Job.Name ~= 'police' then
+        return { success = false, error = 'Not authorized' }
+    end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    local currentPlate = GetVehicleNumberPlateText(vehicle)
+
+    local isFake = FakePlate.isFakePlate(vehicle)
+    local originalPlate = isFake and FakePlate.getOriginal(vehicle) or nil
+
+    return {
+        success = true,
+        isFake = isFake,
+        currentPlate = currentPlate,
+        originalPlate = originalPlate,
+    }
+end)
+```
+
+## Nitro System
+
+### Nitro Kit Crafting
+
+```lua
+-- Craft nitro kit
+lib.callback.register('mechanic:craft:nitroKit', function(source, data)
+    local canCraft, error = CraftRecipes.canCraft(source, 'nitro_kit')
+    if not canCraft then
+        return { success = false, error = error }
+    end
+
+    -- Remove ingredients
+    CraftRecipes.removeIngredients(source, 'nitro_kit')
+
+    -- Create nitro kit with charges
+    local metadata = {
+        charges = MechanicConfig.Craft.NitroCharges, -- Default 3 charges
+        maxCharges = MechanicConfig.Craft.NitroCharges,
+        installedAt = nil,
+    }
+
+    Framework.AddItem(source, 'nitro_kit', 1, metadata)
+
+    return { success = true }
+end)
+```
+
+### Installing Nitro
+
+```lua
+-- Install nitro kit on vehicle
+lib.callback.register('mechanic:nitro:install', function(source, data)
+    local item = Framework.GetItemBySlot(source, data.slot)
+    if not item or item.name ~= 'nitro_kit' then
+        return { success = false, error = 'Invalid item' }
+    end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    -- Check if vehicle already has nitro
+    if NitroSystem.hasNitro(plate) then
+        return { success = false, error = 'Vehicle already has nitro' }
+    end
+
+    -- Install nitro
+    NitroSystem.install(plate, {
+        charges = item.metadata.charges,
+        installedBy = source,
+        installedAt = os.time(),
+    })
+
+    -- Remove item
+    Framework.RemoveItem(source, 'nitro_kit', 1, data.slot)
+
+    -- Sync to client
+    TriggerClientEvent('mechanic:nitro:installed', source, {
+        vehicleNetId = data.vehicleNetId,
+        charges = item.metadata.charges,
+    })
+
+    return { success = true, charges = item.metadata.charges }
+end)
+```
+
+### Nitro Usage Tracking
+
+```lua
+-- Track nitro usage
+RegisterNetEvent('mechanic:nitro:used', function(vehicleNetId)
+    local source = source
+    local vehicle = NetworkGetEntityFromNetworkId(vehicleNetId)
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    local nitroData = NitroSystem.get(plate)
+    if not nitroData or nitroData.charges <= 0 then return end
+
+    -- Decrease charges
+    nitroData.charges = nitroData.charges - 1
+    NitroSystem.update(plate, nitroData)
+
+    -- Notify client of remaining charges
+    TriggerClientEvent('mechanic:nitro:chargeUsed', source, {
+        remaining = nitroData.charges,
+    })
+
+    -- Remove nitro if no charges left
+    if nitroData.charges <= 0 then
+        NitroSystem.remove(plate)
+        TriggerClientEvent('mechanic:nitro:depleted', source)
+    end
+end)
+```
+
+## Craft Zones
+
+### Zone Configuration
+
+```json
+// config/craft_zones.json
+{
+    "zones": [
+        {
+            "id": "shop_1_craft",
+            "shopId": 1,
+            "coords": { "x": -340.0, "y": -142.0, "z": 39.0 },
+            "radius": 3.0,
+            "allowedRecipes": ["fake_plate", "nitro_kit"],
+            "requiredJob": "mechanic"
+        }
+    ]
+}
+```
+
+### Zone Validation
+
+```lua
+-- Check if player is in valid craft zone
+function CraftZones.isPlayerInZone(source, zoneType)
+    local ped = GetPlayerPed(source)
+    local coords = GetEntityCoords(ped)
+
+    for _, zone in ipairs(CraftZones.all) do
+        if zone.id == zoneType or zone.type == zoneType then
+            local distance = #(coords - zone.coords)
+            if distance <= zone.radius then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+```
+
+## Craft Constants
+
+```lua
+-- shared/craft_constants.lua
+CraftConstants = {
+    -- Skill check difficulties
+    SkillDifficulty = {
+        easy = { speed = 0.5, size = 0.3 },
+        medium = { speed = 0.75, size = 0.2 },
+        hard = { speed = 1.0, size = 0.15 },
+    },
+
+    -- Refund percentages on failure
+    RefundRates = {
+        skillCheckFail = 0.5,     -- 50% refund
+        cancelled = 0.75,         -- 75% refund
+    },
+
+    -- Nitro settings
+    Nitro = {
+        DefaultCharges = 3,
+        BoostDuration = 3000,     -- ms
+        BoostMultiplier = 1.5,
+        CooldownTime = 5000,      -- ms
+    },
+}
+```
+
+## Best Practices
+
+1. **Validate server-side** - Never trust client craft requests
+2. **Check ingredients atomically** - Verify all ingredients before removing any
+3. **Log illegal crafts** - Track fake plates and other illegal items
+4. **Use metadata** - Store creation info for investigation
+5. **Implement cooldowns** - Prevent craft spam

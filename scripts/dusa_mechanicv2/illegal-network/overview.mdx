@@ -1,0 +1,261 @@
+---
+title: "Redline Network (Illegal Network)"
+description: "Underground darknet marketplace for illegal vehicle modifications and services"
+---
+
+# Redline Network
+
+The Redline Network is an underground marketplace system that enables illegal vehicle modifications, fake documentation, and black market services.
+
+## Overview
+
+The illegal network module provides:
+
+1. **Darknet Marketplace** - Black market item listings
+2. **Heat System** - Wanted level for illegal activities
+3. **Redline Profiles** - Underground reputation system
+4. **Service Requests** - Anonymous service ordering
+5. **Vehicle Analysis** - VIN scanning and history checks
+6. **Illegal Tuning** - Off-the-books modifications
+
+## Module Structure
+
+```
+modules/illegal_network/
+├── server/
+│   ├── init.lua              # Module initialization
+│   ├── heat.lua              # Heat/wanted system
+│   ├── redline_profiles.lua  # Underground profiles
+│   ├── service_requests.lua  # Service request handling
+│   ├── marketplace.lua       # Darknet marketplace
+│   ├── messaging.lua         # Encrypted messaging
+│   ├── vehicle_analysis.lua  # VIN/vehicle checks
+│   ├── illegal_tuning.lua    # Illegal modifications
+│   └── item_registration.lua # Illegal item definitions
+├── client/
+│   ├── init.lua              # Client initialization
+│   ├── vehicle_analysis.lua  # VIN scanner UI
+│   ├── illegal_tuning.lua    # Illegal mod interface
+│   ├── nui_callbacks.lua     # NUI communication
+│   └── item_usage.lua        # Illegal item usage
+```
+
+## Accessing the Network
+
+### Redline Tablet Access
+
+```lua
+-- Player must have darknet access item
+local hasDarknetAccess = Framework.HasItem(source, 'redline_access_card')
+
+if not hasDarknetAccess then
+    return { success = false, error = 'No network access' }
+end
+
+-- Or have sufficient reputation
+local profile = RedlineProfiles.get(playerIdentifier)
+if profile and profile.reputation >= 100 then
+    -- Access granted
+end
+```
+
+### Network Entry Points
+
+- **Redline Access Card** - Physical item that grants network access
+- **Reputation Unlock** - Earned through illegal activities
+- **Referral System** - Invited by existing members
+
+## Heat System
+
+The heat system tracks a player's illegal activity exposure:
+
+```lua
+-- Heat levels
+HeatLevels = {
+    [0] = 'Clean',           -- No heat
+    [1] = 'Warm',            -- Minor activity
+    [2] = 'Hot',             -- Moderate activity
+    [3] = 'Burning',         -- Heavy activity
+    [4] = 'Wanted',          -- Police actively searching
+    [5] = 'Most Wanted',     -- Maximum heat
+}
+
+-- Activities that add heat
+HeatSources = {
+    fake_plate_applied = 15,
+    illegal_mod_installed = 10,
+    vin_scrubbed = 25,
+    stolen_parts_used = 20,
+    black_market_purchase = 5,
+}
+```
+
+### Heat Decay
+
+```lua
+-- Heat decays over time
+MechanicConfig.IllegalNetwork.Heat = {
+    DecayRate = 1,           -- Points per minute
+    DecayInterval = 60000,   -- Check interval
+    MaxHeat = 100,           -- Maximum heat level
+    PoliceAlertThreshold = 50, -- Alert police at this level
+}
+```
+
+## Redline Profiles
+
+Underground reputation profiles track:
+
+```lua
+RedlineProfile = {
+    identifier = 'player_id',
+    alias = 'Shadow',            -- Network nickname
+    reputation = 0,              -- Reputation points
+    level = 1,                   -- Network level
+    completedJobs = 0,           -- Jobs completed
+    totalEarnings = 0,           -- Money earned illegally
+    specializations = {},        -- Unlocked skills
+    createdAt = timestamp,
+    lastActive = timestamp,
+}
+```
+
+### Reputation Rewards
+
+| Reputation | Level | Unlocks |
+|------------|-------|---------|
+| 0-99 | 1 - Newcomer | Basic marketplace access |
+| 100-249 | 2 - Runner | Service requests |
+| 250-499 | 3 - Operator | Advanced mods |
+| 500-999 | 4 - Professional | VIP marketplace |
+| 1000+ | 5 - Legend | All features, discounts |
+
+## Darknet Marketplace
+
+### Item Categories
+
+```lua
+MarketplaceCategories = {
+    documents = {       -- Fake plates, registrations
+        'fake_plate',
+        'forged_registration',
+        'cloned_vin',
+    },
+    parts = {          -- Stolen/black market parts
+        'stolen_engine',
+        'unmarked_wheels',
+        'stripped_parts',
+    },
+    tools = {          -- Illegal tools
+        'vin_scrubber',
+        'plate_printer',
+        'lockpick_kit',
+    },
+    services = {       -- Underground services
+        'vin_scrub_service',
+        'heat_reduction',
+        'document_forge',
+    },
+}
+```
+
+### Listing Items
+
+```lua
+-- Create marketplace listing
+lib.callback.register('mechanic:redline:createListing', function(source, data)
+    local profile = RedlineProfiles.get(source)
+    if not profile or profile.level < 2 then
+        return { success = false, error = 'Insufficient reputation' }
+    end
+
+    local listingId = Marketplace.createListing({
+        sellerId = profile.identifier,
+        sellerAlias = profile.alias,
+        category = data.category,
+        item = data.item,
+        quantity = data.quantity,
+        price = data.price,
+        description = data.description,
+    })
+
+    return { success = true, listingId = listingId }
+end)
+```
+
+## Service Requests
+
+### Anonymous Services
+
+```lua
+-- Request illegal service
+lib.callback.register('mechanic:redline:requestService', function(source, data)
+    local profile = RedlineProfiles.get(source)
+
+    local request = ServiceRequests.create({
+        requesterId = profile.identifier,
+        serviceType = data.serviceType,
+        vehiclePlate = data.plate,
+        details = data.details,
+        offeredPrice = data.price,
+        anonymous = true,
+    })
+
+    -- Notify available providers
+    ServiceRequests.notifyProviders(request)
+
+    return { success = true, requestId = request.id }
+end)
+```
+
+### Service Types
+
+| Service | Description | Heat Added |
+|---------|-------------|------------|
+| VIN Scrub | Remove vehicle history | 25 |
+| Plate Clone | Clone another vehicle's plate | 20 |
+| Heat Reduction | Bribe to reduce heat | -30 |
+| Parts Swap | Install stolen parts | 15 |
+
+## Configuration
+
+```lua
+MechanicConfig.IllegalNetwork = {
+    Enabled = true,
+
+    -- Access requirements
+    RequireAccessItem = true,
+    AccessItem = 'redline_access_card',
+
+    -- Heat settings
+    Heat = {
+        Enabled = true,
+        DecayRate = 1,
+        DecayInterval = 60000,
+        MaxHeat = 100,
+        PoliceAlertThreshold = 50,
+    },
+
+    -- Marketplace settings
+    Marketplace = {
+        ListingFee = 0.05,        -- 5% listing fee
+        TransactionFee = 0.10,   -- 10% transaction fee
+        MinReputation = 100,     -- Min rep to sell
+    },
+
+    -- Reputation settings
+    Reputation = {
+        JobComplete = 25,
+        SaleComplete = 10,
+        PurchaseBonus = 5,
+        ReferralBonus = 50,
+    },
+}
+```
+
+## Security Considerations
+
+1. **No Direct Police Integration** - Heat system is separate from framework wanted level
+2. **Encrypted Communication** - All network messages are obfuscated
+3. **Anonymous Transactions** - Use aliases instead of real names
+4. **Evidence System** - Actions can leave evidence for police investigation

@@ -1,0 +1,204 @@
+---
+title: "Introduction"
+description: "dusa_mechanicv2 - Complete FiveM mechanic system with vehicle tuning, shop management, work orders, assembly workflow, crafting, and illegal network features"
+---
+
+# dusa_mechanicv2
+
+dusa_mechanicv2 is a comprehensive mechanic and vehicle tuning system for FiveM servers. It provides shop management, employee handling, work orders, vehicle modifications, crafting, and an underground illegal network (Redline).
+
+## Product Overview
+
+**Resource Name:** dusa_mechanicv2  
+**Integration:** Works with dusa_tablet (business management UI runs inside tablet app)  
+**Framework:** Framework-agnostic via dusa_bridge (supports QBCore, ESX, and others)  
+**Database:** MySQL via oxmysql with automatic migrations
+
+## Core Features
+
+### Vehicle Tuning System
+
+The tuning system allows mechanics to modify vehicles with dynamic pricing based on vehicle value.
+
+**Capabilities:**
+- Performance modifications (engine, transmission, brakes, turbo)
+- Cosmetic modifications (paint, livery, spoilers, body kits)
+- Wheel modifications (rims, tires, wheel types)
+- Lighting modifications (xenon, neon underglow)
+- Cinematic camera system with multiple presets
+- Real-time mod preview before purchase
+- Order-based workflow or direct sales
+
+**Files:** `client/tuning/`, `server/tuning/`, `shared/config.tuning.lua`
+
+### Shop Management
+
+Multi-shop support with complete business management via dusa_tablet integration.
+
+**Capabilities:**
+- Create and configure multiple mechanic shops
+- Employee management with grades (0-4)
+- Automatic salary payment system
+- Shop safe/balance management
+- Transaction history and accounting
+- Custom pricing per shop
+- Blip and marker configuration
+
+**Files:** `server/tablet/`, `server/admin/shops.lua`
+
+### Work Order System
+
+Customer service workflow with real-time order tracking.
+
+**Capabilities:**
+- Order creation for repair, tune, maintenance, custom jobs
+- Status tracking: pending → accepted → awaiting_approval → in_progress → completed
+- Order assignment to specific mechanics
+- Order items with individual pricing
+- Customer rating and feedback
+- Unread message notifications
+
+**Files:** `server/tablet/callbacks.lua`, `server/tablet/database.lua`
+
+### Employee System
+
+Grade-based permission system synced with framework jobs.
+
+**Grades:**
+- Grade 0: Basic view permissions
+- Grade 1: Can create orders
+- Grade 2: Can edit orders
+- Grade 3: Can manage employees
+- Grade 4: Full owner permissions
+
+**Files:** `server/tablet/permissions.lua`, `server/tablet/employee_job_sync.lua`
+
+### Assembly System
+
+Hybrid task-based installation workflow with skill checks.
+
+**Capabilities:**
+- Multi-step assembly tasks
+- Skill check minigames (circle, key sequence)
+- Work animations with props
+- Customer vehicle visibility control
+- Pending mods for garage integration
+
+**Files:** `server/assembly/`, `client/assembly/`, `shared/config.assembly.lua`
+
+### Hydraulic Lift System
+
+6-part hydraulic vehicle lifts with remote control.
+
+**Capabilities:**
+- Multiple lift positions
+- Remote controller items
+- Admin wizard for placement
+- Per-shop lift configuration
+
+**Files:** `server/admin/lifts.lua`, `client/lifts/`
+
+### Craft System
+
+Recipe-based crafting for items like fake plates and nitro kits.
+
+**Capabilities:**
+- JSON-based recipe configuration
+- Ingredient validation
+- Skill check requirement
+- Craft zone restrictions
+
+**Files:** `server/craft/`, `client/craft/`, `config/craft_recipes.json`
+
+### Fake Plate System
+
+Create and apply fake license plates to vehicles.
+
+**Capabilities:**
+- Custom plate text creation
+- Apply to any vehicle
+- Police detection capability
+- Original plate tracking
+
+**Files:** `server/craft/fake_plate.lua`
+
+### Nitro System
+
+Craftable nitro kits with limited charges.
+
+**Capabilities:**
+- Nitro kit crafting
+- Vehicle installation
+- Charge-based usage
+- Visual and audio effects
+
+**Files:** `server/craft/nitro_system.lua`, `client/craft/nitro_*.lua`
+
+### Illegal Network (Redline)
+
+Underground darknet marketplace for illegal activities.
+
+**Capabilities:**
+- Redline profiles with reputation system
+- Heat/wanted level tracking with decay
+- VIN scanning and vehicle history
+- VIN scrubbing (history removal)
+- Darknet marketplace for listings
+- Anonymous service requests
+
+**Files:** `modules/illegal_network/`
+
+### Stance/Camber System
+
+Vehicle stance customization with persistence.
+
+**Capabilities:**
+- Front/rear camber adjustment
+- Track width modification
+- Suspension height
+- Database persistence
+
+**Files:** `server/stance/`, `client/stance/`
+
+### Zone System
+
+Admin-created zones for different activities.
+
+**Zone Types:**
+- `tuning` - Vehicle modification zone
+- `repair` - Manual repair zone
+- `storage` - ox_inventory stash zone
+- `shop_ped` - NPC interaction zone
+- `repair_ped` - Auto-repair NPC zone
+- `craft_table` - Crafting station
+
+**Files:** `server/zones/`, `client/zones/`
+
+## Dependencies
+
+| Resource | Purpose |
+|----------|---------|
+| FiveM Server 7290+ | Minimum server version |
+| OneSync | Entity synchronization |
+| ox_lib | Callbacks, UI components, utilities |
+| dusa_bridge | Framework abstraction layer |
+| oxmysql | Database connectivity |
+| dusa_tablet | Tablet UI container (shop management) |
+
+## Architecture
+
+```
+dusa_mechanicv2
+├── Runs inside dusa_tablet (business UI)
+├── Uses dusa_bridge for framework operations
+├── Stores data in MySQL (ds_mechanic_* tables)
+└── React/TypeScript UI in web/ folder
+```
+
+## Quick Start
+
+1. Install dependencies (ox_lib, oxmysql, dusa_bridge, dusa_tablet)
+2. Place dusa_mechanicv2 in resources folder
+3. Add `ensure dusa_mechanicv2` to server.cfg
+4. Database migrations run automatically on first start
+5. Use admin commands to create shops and zones

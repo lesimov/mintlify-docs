@@ -1,0 +1,160 @@
+---
+title: "Craft Configuration"
+description: "Craft sistemi sabitleri ve yapılandırması - shared/craft_constants.lua"
+---
+
+# Craft Yapılandırması
+
+`shared/craft_constants.lua` dosyası sahte plaka ve nitro craft sisteminin sabitlerini içerir.
+
+## Tarif ID'leri
+
+```lua
+CraftConstants.RECIPE_IDS = {
+    FAKE_PLATE = 'fake_plate',
+    FAKE_PLATE_REMOVER = 'fake_plate_remover',
+    NITRO_CRAFT = 'nitro_craft',
+    NITRO_REFILL = 'nitro_refill',
+}
+```
+
+## Item Tipleri
+
+```lua
+CraftConstants.ITEM_TYPES = {
+    FAKE_PLATE = 'fake_plate',
+    FAKE_PLATE_REMOVER = 'fake_plate_remover',
+    NITRO = 'nitro',
+    NITRO_REFILL = 'nitro_refill',
+}
+```
+
+## Çıktı Item'ları
+
+```lua
+CraftConstants.OUTPUT_ITEMS = {
+    FAKE_PLATE = 'fake_plate',
+    FAKE_PLATE_REMOVER = 'fake_plate_remover',
+    NITRO_FILLED = 'nitro_filled',
+    NITRO_EMPTY = 'nitro_empty',
+}
+```
+
+## Malzemeler
+
+```lua
+CraftConstants.MATERIALS = {
+    -- Sahte Plaka
+    BLANK_PLATE = 'blank_plate',
+    PLATE_INK = 'plate_ink',
+    -- Sahte Plaka Sökücü
+    SCREWDRIVER = 'screwdriver',
+    SOLVENT = 'solvent',
+    -- Nitro
+    NITRO_BOTTLE = 'nitro_bottle',
+    NITRO_KIT = 'nitro_kit',
+    NITRO_EMPTY = 'nitro_empty',
+}
+```
+
+## Heat (Isı) Değerleri
+
+```lua
+CraftConstants.HEAT = {
+    FAKE_PLATE = 3,      -- Plaka takıldığında
+    NITRO_PER_USE = 5,   -- Nitro kullanımı başına
+}
+```
+
+## Craft Süreleri
+
+```lua
+CraftConstants.CRAFT_TIMES = {
+    FAKE_PLATE = 15,         -- 15 saniye
+    FAKE_PLATE_REMOVER = 10, -- 10 saniye
+    NITRO_CRAFT = 20,        -- 20 saniye
+    NITRO_REFILL = 10,       -- 10 saniye
+}
+```
+
+## Nitro Ayarları
+
+```lua
+CraftConstants.NITRO = {
+    DEFAULT_KEY = 'G',
+    POWER_MULTIPLIER = 2.0,   -- 2x güç
+    DURATION = 3.0,           -- 3 saniye boost
+    DRAIN_RATE = 1,           -- Aktivasyon başına tüketim
+    COOLDOWN = 5.0,           -- 5 saniye bekleme
+    SCREEN_EFFECTS = true,
+    REAR_LIGHT_TRAILS = true,
+    PARTICLE_SCALE = 1.0,
+    SOUND_ENABLED = true,
+    ALLOW_IN_WATER = false,
+    REQUIRE_THROTTLE = true,
+    ELECTRIC_VEHICLES = {     -- Nitro yasak araçlar
+        'neon', 'voltic', 'cyclone', 'tezeract', ...
+    },
+}
+```
+
+## Nitro Dolum Ayarları
+
+```lua
+CraftConstants.REFILL = {
+    DURATION = 4000,
+    FUEL_ITEM = 'nitro_bottle',
+    EMPTY_ITEM = 'nitro_empty',
+    OUTPUT_ITEM = 'nitro_filled',
+    FUEL_REQUIRED = 1,
+    EMPTY_REQUIRED = 1,
+    OUTPUT_USES = 100,
+    HEAT_PER_USE = 5,
+}
+```
+
+## Sahte Plaka Ayarları
+
+```lua
+CraftConstants.FAKE_PLATE = {
+    INSTALL_ITEM = 'fake_plate',
+    INSTALL_DISTANCE = 3.0,
+    INSTALL_DURATION = 8000,
+    INSTALL_ANIM_DICT = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@',
+    INSTALL_ANIM_NAME = 'machinic_loop_mechandplayer',
+    REMOVER_ITEM = 'fake_plate_remover',
+    REMOVE_DURATION = 6000,
+    SKILL_CHECK = {
+        difficulty = { 'easy', 'easy' },
+        keys = { 'w', 'a', 's', 'd' },
+    },
+}
+```
+
+## Doğrulama Kuralları
+
+```lua
+CraftConstants.VALIDATION = {
+    MAX_MATERIALS_PER_RECIPE = 4,
+    MIN_MATERIALS_PER_RECIPE = 2,
+    MAX_CRAFT_TIME = 60,
+    MIN_CRAFT_TIME = 5,
+    MAX_HEAT_VALUE = 10,
+    MIN_HEAT_VALUE = 1,
+}
+```
+
+## Hata Kodları
+
+```lua
+CraftConstants.ERRORS = {
+    INVALID_RECIPE = 'INVALID_RECIPE',
+    MISSING_MATERIALS = 'MISSING_MATERIALS',
+    INSUFFICIENT_QUANTITY = 'INSUFFICIENT_QUANTITY',
+    ALREADY_CRAFTING = 'ALREADY_CRAFTING',
+    CRAFT_FAILED = 'CRAFT_FAILED',
+    PERMISSION_DENIED = 'PERMISSION_DENIED',
+    INVALID_SHOP = 'INVALID_SHOP',
+    DATABASE_ERROR = 'DATABASE_ERROR',
+}
+```

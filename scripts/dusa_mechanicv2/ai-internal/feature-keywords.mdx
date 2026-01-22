@@ -1,0 +1,351 @@
+---
+title: "Feature Keywords Index"
+description: "Searchable keyword index for AI semantic search to quickly find relevant features and code locations"
+---
+
+# Feature Keywords Index
+
+This document provides a keyword-based index for AI semantic search. Each entry maps common user questions to the relevant features, files, and configurations.
+
+## Tuning / Modifications
+
+**Keywords:** tuning, mods, modifications, vehicle mods, car mods, upgrade, performance, engine, turbo, transmission, brakes, suspension, spoiler, wheels, rims, tires, paint, color, wrap, livery, neon, xenon, headlights, taillights, exhaust, horn, window tint
+
+**Related Files:**
+- `client/tuning/main.lua` - Entry point
+- `client/tuning/mods.lua` - Mod application
+- `client/tuning/preview.lua` - Preview system
+- `client/tuning/camera.lua` - Cinematic camera
+- `server/tuning/main.lua` - Server logic
+- `server/tuning/vehicle_value.lua` - Dynamic pricing
+- `shared/config.mods.lua` - Mod definitions
+- `shared/config.tuning.lua` - Prices, settings
+
+**Database:** `ds_mechanic_vehicle_mods`, `ds_mechanic_modification_codes`
+
+**Callbacks:** `mechanic:tuning:*`
+
+---
+
+## Orders / Work Orders
+
+**Keywords:** order, work order, service request, customer, job, task, repair request, tuning order, appointment, queue, pending, in progress, completed, cancelled, awaiting approval
+
+**Related Files:**
+- `server/tablet/callbacks.lua` - Order CRUD
+- `server/tablet/database.lua` - Order queries
+- `web/src/pages/orders/` - Order UI
+
+**Database:** `ds_mechanic_orders`, `ds_mechanic_order_items`
+
+**Callbacks:** `mechanic:tablet:getOrders`, `mechanic:tablet:createOrder`, `mechanic:tablet:updateOrder`
+
+---
+
+## Employees / Staff
+
+**Keywords:** employee, staff, worker, mechanic, hire, fire, salary, wage, pay, grade, role, permission, boss, owner, manager, technician, rookie, veteran
+
+**Related Files:**
+- `server/tablet/callbacks.lua` - Employee management
+- `server/tablet/permissions.lua` - Permission system
+- `server/tablet/employee_job_sync.lua` - Framework sync
+- `server/tablet/salary_payments.lua` - Salary system
+
+**Database:** `ds_mechanic_employees`
+
+**Callbacks:** `mechanic:tablet:getEmployees`, `mechanic:tablet:hireEmployee`, `mechanic:tablet:fireEmployee`
+
+**Config:** `MechanicConfig.Salary`, `MechanicConfig.JobSystem`
+
+---
+
+## Shop / Business
+
+**Keywords:** shop, garage, business, store, location, balance, money, funds, safe, cash register, withdraw, deposit, transaction, income, expense, settings, blip, marker
+
+**Related Files:**
+- `server/admin/shops.lua` - Shop CRUD
+- `server/tablet/database.lua` - Shop queries
+- `client/blips.lua` - Map blips
+
+**Database:** `ds_mechanic_shops`, `ds_mechanic_transactions`
+
+**Callbacks:** `mechanic:tablet:getShopInfo`, `mechanic:admin:createShop`
+
+---
+
+## Zones
+
+**Keywords:** zone, area, tuning zone, repair zone, storage zone, lift zone, interaction, enter, exit, marker, prompt, stash, inventory
+
+**Related Files:**
+- `server/zones/tuning_zones.lua`
+- `server/zones/repair_zones.lua`
+- `server/zones/storage_zones.lua`
+- `server/zones/shop_zones.lua`
+- `client/zones/*.lua`
+
+**Database:** `ds_mechanic_zones`
+
+**Zone Types:** `tuning`, `repair`, `storage`, `shop_ped`, `repair_ped`, `craft_table`
+
+---
+
+## Lifts / Hydraulic Lifts
+
+**Keywords:** lift, hydraulic lift, car lift, vehicle lift, jack, raise, lower, remote control, lift control, lift position
+
+**Related Files:**
+- `server/admin/lifts.lua` - Lift management
+- `server/lifts/lift_control.lua` - Lift state
+- `client/lifts/*.lua` - Client controls
+
+**Database:** `ds_mechanic_lifts`
+
+**Callbacks:** `mechanic:lift:*`
+
+---
+
+## Assembly / Installation
+
+**Keywords:** assembly, install, installation, task, skill check, minigame, animation, progress, tool, prop, wrench, repair animation, work animation
+
+**Related Files:**
+- `server/assembly/main.lua`
+- `client/assembly/main.lua`
+- `shared/config.assembly.lua`
+
+**Callbacks:** `mechanic:assembly:*`
+
+---
+
+## Craft / Crafting
+
+**Keywords:** craft, crafting, recipe, ingredient, material, create, make, fake plate, nitro, nitro kit, craft table, craft zone
+
+**Related Files:**
+- `server/craft/recipes.lua`
+- `server/craft/execution.lua`
+- `server/craft/fake_plate.lua`
+- `server/craft/nitro_system.lua`
+- `client/craft/*.lua`
+- `config/craft_recipes.json`
+
+**Callbacks:** `mechanic:craft:*`
+
+---
+
+## Fake Plates / License Plates
+
+**Keywords:** fake plate, license plate, plate, clone plate, forged plate, illegal plate, plate swap, original plate
+
+**Related Files:**
+- `server/craft/fake_plate.lua`
+- `client/craft/fake_plate.lua`
+
+**Database:** `ds_mechanic_fake_plates`
+
+---
+
+## Nitro / NOS
+
+**Keywords:** nitro, nos, boost, nitrous, speed boost, nitro kit, nitro charge, install nitro
+
+**Related Files:**
+- `server/craft/nitro_system.lua`
+- `client/craft/nitro_*.lua`
+
+**Config:** `CraftConstants.Nitro`
+
+---
+
+## Illegal Network / Redline
+
+**Keywords:** illegal, redline, darknet, black market, underground, criminal, heat, wanted, reputation, alias, anonymous, marketplace, listing
+
+**Related Files:**
+- `modules/illegal_network/server/*.lua`
+- `modules/illegal_network/client/*.lua`
+
+**Database:** `ds_mechanic_redline_profiles`, `ds_mechanic_vehicle_heat`
+
+**Callbacks:** `mechanic:redline:*`
+
+**Config:** `MechanicConfig.IllegalNetwork`
+
+---
+
+## Vehicle Analysis / VIN
+
+**Keywords:** VIN, vehicle identification, scan, scanner, history, stolen, flag, check vehicle, vehicle check, VIN scrub, clean vehicle
+
+**Related Files:**
+- `modules/illegal_network/server/vehicle_analysis.lua`
+- `modules/illegal_network/client/vehicle_analysis.lua`
+
+**Callbacks:** `mechanic:redline:scanVIN`, `mechanic:redline:scrubVIN`
+
+---
+
+## Heat System / Wanted
+
+**Keywords:** heat, wanted level, police, alert, decay, illegal activity, exposure, criminal activity
+
+**Related Files:**
+- `modules/illegal_network/server/heat.lua`
+
+**Database:** `ds_mechanic_vehicle_heat`
+
+**Config:** `MechanicConfig.IllegalNetwork.Heat`
+
+---
+
+## Stance / Camber
+
+**Keywords:** stance, camber, suspension, track width, lowering, fitment, wheel fitment, offset, wheel offset
+
+**Related Files:**
+- `server/stance/database.lua`
+- `server/stance/sync.lua`
+- `client/stance/*.lua`
+- `server/tuning/fitment.lua`
+
+**Database:** `ds_mechanic_vehicle_stance`
+
+**Callbacks:** `mechanic:stance:*`
+
+---
+
+## Repair
+
+**Keywords:** repair, fix, damage, body damage, engine damage, repair zone, repair cost, auto repair, NPC repair
+
+**Related Files:**
+- `server/zones/repair_zones.lua`
+- `server/zones/repair_ped_zones.lua`
+- `client/zones/repair_*.lua`
+- `shared/config.repair.lua`
+
+---
+
+## Admin / Management
+
+**Keywords:** admin, administrator, management, create shop, delete shop, create zone, admin panel, wizard, session
+
+**Related Files:**
+- `server/admin/*.lua`
+- `client/admin/*.lua`
+
+**Callbacks:** `mechanic:admin:*`
+
+**Commands:** `mechanic_admin`, `mechanic_debug`, `mechanic_health_*`
+
+---
+
+## Tablet / UI
+
+**Keywords:** tablet, UI, interface, menu, NUI, React, app, application, dusa_tablet
+
+**Related Files:**
+- `client/tablet_integration.lua` - NUI callbacks
+- `web/src/` - React source
+- `dist/` - Built UI
+
+**Integration:** Runs inside `dusa_tablet` resource
+
+---
+
+## Database / Migration
+
+**Keywords:** database, MySQL, migration, schema, table, column, query, SQL, oxmysql, collation
+
+**Related Files:**
+- `server/database/init.lua`
+- `server/database/migration.lua`
+- `sql/migrations/*.sql`
+
+**Commands:** `mechanic_db_status`, `mechanic_health_check`, `mechanic_fix_collation`
+
+---
+
+## Debug / Logging
+
+**Keywords:** debug, log, logging, error, trace, info, warn, fatal, telemetry, console, verbose
+
+**Related Files:**
+- `server/debug/logging.lua` - MechanicLogger
+- `server/debug/telemetry.lua` - Telemetry
+- `client/debug/main.lua` - ClientDebug
+
+**Config:** `MechanicConfig.Debug`
+
+---
+
+## Garage Integration
+
+**Keywords:** garage, vehicle spawn, pending mods, race condition, locked vehicle, assembly lock
+
+**Related Files:**
+- `server/api/garage_integration.lua`
+- `modules/garage_integration/*.lua`
+
+**Exports:** `IsVehicleLockedByMechanic`, `HasPendingMods`, `ApplyPendingMods`
+
+---
+
+## Camera System
+
+**Keywords:** camera, cinematic camera, preview camera, camera preset, swipe, rotate, camera angle, front view, rear view
+
+**Related Files:**
+- `client/tuning/camera.lua`
+- `client/debug/camera_editor.lua`
+
+---
+
+## Permissions / Access Control
+
+**Keywords:** permission, access, role, grade, authorize, deny, check, can view, can edit, can manage
+
+**Related Files:**
+- `server/tablet/permissions.lua` - TabletPermissions
+- `server/tablet/validation.lua` - TabletValidation
+
+---
+
+## Locale / Translation
+
+**Keywords:** locale, language, translation, text, label, Turkish, English, i18n, localization
+
+**Related Files:**
+- `locales/en.json`
+- `locales/tr.json`
+- `client/locales/*.lua`
+
+**Config:** `MechanicConfig.Locale`
+
+---
+
+## Items / Inventory
+
+**Keywords:** item, inventory, vehicle kit, repair kit, cleaning kit, remote, controller, ox_inventory
+
+**Related Files:**
+- `server/items/vehicle_kits.lua`
+- `server/items/remote_controllers.lua`
+- `client/items/*.lua`
+- `modules/illegal_network/server/item_registration.lua`
+
+---
+
+## Blips / Map Markers
+
+**Keywords:** blip, map marker, minimap, GPS, shop location, map icon
+
+**Related Files:**
+- `client/blips.lua`
+
+**Database:** `ds_mechanic_shops` (blip_enabled, blip_sprite, blip_color)
+
+**Export:** `RefreshShopBlips()`

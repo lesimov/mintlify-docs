@@ -1,0 +1,157 @@
+---
+title: "Repair Configuration"
+description: "Onarım sistemi yapılandırması - shared/config.repair.lua"
+---
+
+# Repair Yapılandırması
+
+`shared/config.repair.lua` dosyası araç onarım sisteminin ayarlarını içerir.
+
+## Temel Ayarlar
+
+```lua
+RepairConfig = {
+    simpleMode = false,     -- true = sadece motor onarımı
+    repairKitProp = 'prop_tool_box_04',
+    wrenchProp = 'prop_tool_wrench',
+    toolboxProp = 'prop_tool_box_04',
+    zoneRadius = 5.0,
+    interactionDistance = 3.0,
+}
+```
+
+## Onarım Modları
+
+### Simple Mode
+- Sadece motor onarımı
+- Tüm aracı tamir eder
+
+### Complex Mode
+- Motor + Gövde onarımı
+- Ayrı prop'lar ve animasyonlar
+
+## Motor Onarımı
+
+```lua
+RepairConfig.motorRepair = {
+    animDict = 'mini@repair',
+    anim = 'fixing_a_player',
+    duration = 10000,  -- 10 saniye
+    label = 'repair.label_motor',
+    icon = 'fa-solid fa-gear',
+}
+```
+
+## Gövde Onarımı
+
+```lua
+RepairConfig.bodyRepair = {
+    animDict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@',
+    anim = 'machinic_loop_mechandoormechanic',
+    duration = 8000,  -- 8 saniye
+    label = 'repair.label_body',
+    icon = 'fa-solid fa-car',
+}
+```
+
+## Target Seçenekleri
+
+```lua
+RepairConfig.targetOptions = {
+    {
+        name = 'mechanic_motor_repair',
+        icon = 'fa-solid fa-gear',
+        label = 'repair.label_motor',
+        action = 'motor',
+    },
+    {
+        name = 'mechanic_body_repair',
+        icon = 'fa-solid fa-car',
+        label = 'repair.label_body',
+        action = 'body',
+        complexOnly = true,  -- Sadece complex modda
+    },
+}
+```
+
+## Onarım Maliyetleri
+
+```lua
+RepairConfig.costs = {
+    motor = 0,  -- Ücretsiz
+    body = 0,
+}
+```
+
+## İzinler
+
+```lua
+RepairConfig.requireEmployee = false  -- Sadece çalışanlar kullanabilir
+```
+
+---
+
+# Otomatik Onarım NPC
+
+Online mekanik olmadığında NPC ile onarım.
+
+## NPC Ayarları
+
+```lua
+RepairPedConfig = {
+    enabled = true,
+    defaultPedModel = 's_m_y_xmech_02',
+    pedScenario = 'WORLD_HUMAN_WELDING',
+    interactionDistance = 3.0,
+}
+```
+
+## Alternatif Modeller
+
+```lua
+RepairPedConfig.alternativeModels = {
+    's_m_m_autoshop_01',
+    's_m_m_autoshop_02',
+    's_m_y_xmech_01',
+    's_m_y_xmech_02',
+    'a_m_y_mexthug_01',
+}
+```
+
+## Otomatik Onarım Zamanlaması
+
+```lua
+RepairPedConfig.autoRepair = {
+    totalDuration = 120000,     -- 2 dakika
+    debugDuration = 10000,      -- Debug modda 10 saniye
+    phases = {
+        { name = 'inspection', durationPercent = 0.125, position = 'front' },
+        { name = 'engine', durationPercent = 0.25, position = 'hood' },
+        { name = 'side_left', durationPercent = 0.167, position = 'left' },
+        { name = 'side_right', durationPercent = 0.167, position = 'right' },
+        { name = 'rear', durationPercent = 0.125, position = 'rear' },
+        { name = 'final', durationPercent = 0.166, position = 'front' },
+    },
+}
+```
+
+## Faz Animasyonları
+
+```lua
+RepairPedConfig.autoRepair.animations = {
+    inspection = { dict = 'amb@world_human_clipboard@male@idle_a', anim = 'idle_c' },
+    engine = { dict = 'mini@repair', anim = 'fixing_a_player' },
+    side_left = { dict = 'amb@world_human_welding@male@idle_a', anim = 'idle_a' },
+    side_right = { dict = 'mp_car_bomb', anim = 'car_bomb_mechanic' },
+    rear = { dict = 'anim@amb@clubhouse@tutorial@bkr_tut_ig3@', anim = 'machinic_loop_mechandoormechanic' },
+    final = { dict = 'mini@repair', anim = 'fixing_a_ped' },
+}
+```
+
+## NPC Maliyeti
+
+```lua
+RepairPedConfig.costs = {
+    fullRepair = 500,  -- $500
+}
+```

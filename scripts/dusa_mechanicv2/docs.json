@@ -1,0 +1,111 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Dusa Mechanic V2",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "https://discord.gg/dusa"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Purchase",
+    "url": "https://dusa.tebex.io"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Discord",
+      "icon": "discord",
+      "url": "https://discord.gg/dusa"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/Dusa-DD"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "installation"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/main-config",
+        "configuration/tuning-config",
+        "configuration/assembly-config",
+        "configuration/lift-config",
+        "configuration/repair-config",
+        "configuration/craft-config"
+      ]
+    },
+    {
+      "group": "Server Modules",
+      "pages": [
+        "server/debug",
+        "server/database",
+        "server/tablet",
+        "server/tuning",
+        "server/zones",
+        "server/craft",
+        "server/assembly",
+        "server/admin",
+        "server/stance",
+        "server/items"
+      ]
+    },
+    {
+      "group": "Client Modules",
+      "pages": [
+        "client/tablet-integration",
+        "client/tuning",
+        "client/lifts",
+        "client/assembly"
+      ]
+    },
+    {
+      "group": "Illegal Network (Redline)",
+      "pages": [
+        "illegal-network/overview",
+        "illegal-network/vehicle-analysis"
+      ]
+    },
+    {
+      "group": "AI Reference",
+      "pages": [
+        "ai-internal/codebase-map",
+        "ai-internal/database-schema",
+        "ai-internal/api-reference",
+        "ai-internal/troubleshooting",
+        "ai-internal/feature-keywords"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "discord": "https://discord.gg/dusa",
+    "github": "https://github.com/Dusa-DD"
+  }
+}

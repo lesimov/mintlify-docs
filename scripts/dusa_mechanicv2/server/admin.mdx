@@ -1,0 +1,530 @@
+---
+title: "Admin System"
+description: "Server-side administration for shops, marketplace, zones, lifts, and session management"
+---
+
+# Admin System
+
+The admin system provides comprehensive management tools for shop owners and server administrators.
+
+## Overview
+
+The admin system consists of seven main components:
+
+1. **Shops** - Shop CRUD operations
+2. **Marketplace** - Shop listing and marketplace
+3. **Zones** - Zone management (tuning, repair, storage)
+4. **Lift Entities** - Lift object management
+5. **Lifts** - Lift CRUD callbacks
+6. **Locks** - Resource locking system
+7. **Session** - Shop creation wizard
+
+## Shop Administration
+
+### Creating Shops
+
+```lua
+lib.callback.register('mechanic:admin:createShop', function(source, data)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    -- Validate shop data
+    local isValid, error = TabletValidation.validateShop(data)
+    if not isValid then
+        return TabletValidation.invalidDataError(error)
+    end
+
+    -- Create shop
+    local shopId = MySQL.insert.await([[
+        INSERT INTO ds_mechanic_shops
+        (name, label, owner_identifier, job_name, location, settings)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ]], {
+        data.name,
+        data.label,
+        data.ownerIdentifier,
+        data.jobName,
+        json.encode(data.location),
+        json.encode(data.settings or {}),
+    })
+
+    -- Create default zones
+    AdminShops.createDefaultZones(shopId, data.location)
+
+    -- Refresh cache
+    ShopCache.refresh()
+
+    MechanicLogger.info('ADMIN', 'Shop created', {
+        shopId = shopId,
+        name = data.name,
+        createdBy = source,
+    })
+
+    return { success = true, shopId = shopId }
+end)
+```
+
+### Updating Shops
+
+```lua
+lib.callback.register('mechanic:admin:updateShop', function(source, data)
+    local shop = AdminShops.get(data.shopId)
+    if not shop then
+        return TabletValidation.notFoundError('Shop')
+    end
+
+    -- Check permission (admin or shop owner)
+    if not TabletPermissions.canManageShop(source, data.shopId) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    MySQL.update.await([[
+        UPDATE ds_mechanic_shops
+        SET name = ?, label = ?, job_name = ?, settings = ?
+        WHERE id = ?
+    ]], {
+        data.name,
+        data.label,
+        data.jobName,
+        json.encode(data.settings),
+        data.shopId,
+    })
+
+    ShopCache.refresh()
+
+    return { success = true }
+end)
+```
+
+### Deleting Shops
+
+```lua
+lib.callback.register('mechanic:admin:deleteShop', function(source, data)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    -- Soft delete
+    MySQL.update.await([[
+        UPDATE ds_mechanic_shops SET is_active = 0 WHERE id = ?
+    ]], { data.shopId })
+
+    -- Also deactivate related zones
+    MySQL.update.await([[
+        UPDATE ds_mechanic_zones SET is_active = 0 WHERE shop_id = ?
+    ]], { data.shopId })
+
+    ShopCache.refresh()
+    ZoneCache.refresh()
+
+    MechanicLogger.info('ADMIN', 'Shop deleted', {
+        shopId = data.shopId,
+        deletedBy = source,
+    })
+
+    return { success = true }
+end)
+```
+
+## Marketplace System
+
+### Listing Shops for Sale
+
+```lua
+lib.callback.register('mechanic:marketplace:listShop', function(source, data)
+    local shop = AdminShops.get(data.shopId)
+    if not shop then
+        return TabletValidation.notFoundError('Shop')
+    end
+
+    -- Only owner can list
+    if not TabletPermissions.isShopOwner(source, data.shopId) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    -- Validate price
+    if data.price < MechanicConfig.Marketplace.MinPrice then
+        return { success = false, error = 'Price too low' }
+    end
+
+    MySQL.update.await([[
+        UPDATE ds_mechanic_shops
+        SET marketplace_listing = ?
+        WHERE id = ?
+    ]], {
+        json.encode({
+            price = data.price,
+            listedAt = os.time(),
+            listedBy = Framework.GetPlayer(source).Identifier,
+        }),
+        data.shopId,
+    })
+
+    return { success = true }
+end)
+```
+
+### Purchasing Shops
+
+```lua
+lib.callback.register('mechanic:marketplace:purchaseShop', function(source, data)
+    local shop = AdminShops.get(data.shopId)
+    if not shop or not shop.marketplace_listing then
+        return { success = false, error = 'Shop not for sale' }
+    end
+
+    local listing = json.decode(shop.marketplace_listing)
+    local player = Framework.GetPlayer(source)
+
+    -- Check funds
+    if player.GetMoney('bank') < listing.price then
+        return { success = false, error = 'Insufficient funds' }
+    end
+
+    -- Process transaction
+    player.RemoveMoney('bank', listing.price, 'Shop purchase')
+
+    -- Pay previous owner
+    local previousOwner = Framework.GetPlayerByIdentifier(shop.owner_identifier)
+    if previousOwner then
+        previousOwner.AddMoney('bank', listing.price, 'Shop sale')
+    else
+        -- Offline payment
+        AdminMarketplace.scheduleOfflinePayment(shop.owner_identifier, listing.price)
+    end
+
+    -- Transfer ownership
+    MySQL.update.await([[
+        UPDATE ds_mechanic_shops
+        SET owner_identifier = ?, marketplace_listing = NULL
+        WHERE id = ?
+    ]], { player.Identifier, data.shopId })
+
+    ShopCache.refresh()
+
+    return { success = true }
+end)
+```
+
+## Lift Management
+
+### Creating Lifts
+
+```lua
+lib.callback.register('mechanic:admin:createLift', function(source, data)
+    if not TabletPermissions.canManageShop(source, data.shopId) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    -- Validate lift position
+    if not AdminLifts.isValidPosition(data.coords) then
+        return { success = false, error = 'Invalid lift position' }
+    end
+
+    local liftId = MySQL.insert.await([[
+        INSERT INTO ds_mechanic_lifts
+        (shop_id, coords, heading, settings)
+        VALUES (?, ?, ?, ?)
+    ]], {
+        data.shopId,
+        json.encode(data.coords),
+        data.heading,
+        json.encode(data.settings or {}),
+    })
+
+    -- Spawn lift entities
+    AdminLiftEntities.spawn(liftId, data.coords, data.heading)
+
+    LiftCache.refresh()
+
+    return { success = true, liftId = liftId }
+end)
+```
+
+### Lift Entity Management
+
+```lua
+-- Spawn lift parts
+function AdminLiftEntities.spawn(liftId, coords, heading)
+    local liftData = {
+        liftId = liftId,
+        parts = {},
+    }
+
+    -- Spawn 6 lift parts
+    for i = 1, 6 do
+        local partModel = MechanicConfig.Lifts.PartModels[i]
+        local partOffset = MechanicConfig.Lifts.PartOffsets[i]
+
+        local partCoords = vector3(
+            coords.x + partOffset.x,
+            coords.y + partOffset.y,
+            coords.z + partOffset.z
+        )
+
+        local entity = CreateObject(
+            GetHashKey(partModel),
+            partCoords.x, partCoords.y, partCoords.z,
+            true, true, true
+        )
+
+        SetEntityHeading(entity, heading)
+        FreezeEntityPosition(entity, true)
+
+        liftData.parts[i] = {
+            entity = entity,
+            model = partModel,
+            coords = partCoords,
+        }
+    end
+
+    LiftEntities[liftId] = liftData
+end
+
+-- Despawn lift
+function AdminLiftEntities.despawn(liftId)
+    local liftData = LiftEntities[liftId]
+    if not liftData then return end
+
+    for _, part in ipairs(liftData.parts) do
+        if DoesEntityExist(part.entity) then
+            DeleteEntity(part.entity)
+        end
+    end
+
+    LiftEntities[liftId] = nil
+end
+```
+
+## Resource Locking
+
+### Lock System
+
+The lock system prevents concurrent modifications to shop resources:
+
+```lua
+-- Acquire lock
+function AdminLocks.acquire(resourceType, resourceId, source)
+    local lockKey = resourceType .. ':' .. resourceId
+    local existingLock = Locks[lockKey]
+
+    if existingLock then
+        if existingLock.source ~= source then
+            return false, 'Resource locked by another user'
+        end
+        -- Refresh lock
+        existingLock.expiresAt = os.time() + MechanicConfig.Admin.LockTimeout
+        return true
+    end
+
+    Locks[lockKey] = {
+        source = source,
+        acquiredAt = os.time(),
+        expiresAt = os.time() + MechanicConfig.Admin.LockTimeout,
+    }
+
+    return true
+end
+
+-- Release lock
+function AdminLocks.release(resourceType, resourceId, source)
+    local lockKey = resourceType .. ':' .. resourceId
+    local lock = Locks[lockKey]
+
+    if lock and lock.source == source then
+        Locks[lockKey] = nil
+        return true
+    end
+
+    return false
+end
+
+-- Auto-expire locks
+CreateThread(function()
+    while true do
+        Wait(60000) -- Check every minute
+
+        local now = os.time()
+        for key, lock in pairs(Locks) do
+            if lock.expiresAt < now then
+                Locks[key] = nil
+                MechanicLogger.debug('ADMIN', 'Lock expired', { key = key })
+            end
+        end
+    end
+end)
+```
+
+### Using Locks
+
+```lua
+lib.callback.register('mechanic:admin:editZone', function(source, data)
+    -- Acquire lock
+    local locked, error = AdminLocks.acquire('zone', data.zoneId, source)
+    if not locked then
+        return { success = false, error = error }
+    end
+
+    -- Perform edit
+    local result = AdminZones.update(data.zoneId, data)
+
+    -- Release lock
+    AdminLocks.release('zone', data.zoneId, source)
+
+    return result
+end)
+```
+
+## Session-Based Shop Creation
+
+### Wizard Steps
+
+```lua
+-- Shop creation wizard
+AdminSession.steps = {
+    'basic_info',      -- Name, label, job
+    'location',        -- Coords, heading
+    'zones',           -- Tuning, repair, storage zones
+    'lifts',           -- Lift positions
+    'employees',       -- Initial employees
+    'settings',        -- Shop settings
+    'review',          -- Final review
+}
+```
+
+### Session Management
+
+```lua
+-- Start wizard session
+lib.callback.register('mechanic:admin:startWizard', function(source)
+    if not TabletPermissions.isAdmin(source) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    local sessionId = AdminSession.create(source)
+
+    return {
+        success = true,
+        sessionId = sessionId,
+        steps = AdminSession.steps,
+        currentStep = 1,
+    }
+end)
+
+-- Update wizard step
+lib.callback.register('mechanic:admin:wizardStep', function(source, data)
+    local session = AdminSession.get(data.sessionId)
+    if not session or session.source ~= source then
+        return { success = false, error = 'Invalid session' }
+    end
+
+    -- Validate step data
+    local isValid, error = AdminSession.validateStep(session.currentStep, data.stepData)
+    if not isValid then
+        return { success = false, error = error }
+    end
+
+    -- Store step data
+    AdminSession.updateStepData(data.sessionId, session.currentStep, data.stepData)
+
+    -- Move to next step
+    if data.action == 'next' then
+        session.currentStep = session.currentStep + 1
+    elseif data.action == 'previous' then
+        session.currentStep = math.max(1, session.currentStep - 1)
+    end
+
+    AdminSession.update(data.sessionId, session)
+
+    return {
+        success = true,
+        currentStep = session.currentStep,
+        isLastStep = session.currentStep == #AdminSession.steps,
+    }
+end)
+
+-- Complete wizard
+lib.callback.register('mechanic:admin:completeWizard', function(source, data)
+    local session = AdminSession.get(data.sessionId)
+    if not session then return { success = false } end
+
+    -- Create shop from session data
+    local shopData = AdminSession.compile(session)
+    local shopId = AdminShops.createFromWizard(shopData)
+
+    -- Clean up session
+    AdminSession.delete(data.sessionId)
+
+    return { success = true, shopId = shopId }
+end)
+```
+
+## Advertisement Management
+
+### Creating Ads
+
+```lua
+lib.callback.register('mechanic:admin:createAd', function(source, data)
+    if not TabletPermissions.canManageShop(source, data.shopId) then
+        return TabletValidation.permissionDeniedError()
+    end
+
+    local adId = MySQL.insert.await([[
+        INSERT INTO ds_mechanic_ads
+        (shop_id, title, description, image_url, start_date, end_date)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ]], {
+        data.shopId,
+        data.title,
+        data.description,
+        data.imageUrl,
+        data.startDate,
+        data.endDate,
+    })
+
+    return { success = true, adId = adId }
+end)
+```
+
+### Fetching Active Ads
+
+```lua
+lib.callback.register('mechanic:tablet:getAds', function(source)
+    local ads = MySQL.query.await([[
+        SELECT a.*, s.name as shop_name, s.label as shop_label
+        FROM ds_mechanic_ads a
+        JOIN ds_mechanic_shops s ON a.shop_id = s.id
+        WHERE a.is_active = 1
+        AND NOW() BETWEEN a.start_date AND a.end_date
+        ORDER BY a.created_at DESC
+        LIMIT 10
+    ]])
+
+    return { success = true, ads = ads }
+end)
+```
+
+## Admin Permissions Check
+
+```lua
+-- Export for checking admin status
+exports('isAdmin', function(source)
+    return TabletPermissions.isAdmin(source)
+end)
+
+-- Admin permission levels
+MechanicConfig.Admin = {
+    -- Players with these identifiers are always admin
+    SuperAdmins = {
+        'license:xxxxx',
+        'discord:xxxxx',
+    },
+
+    -- Framework-based admin check
+    UseFrameworkAdmin = true,
+
+    -- Admin ace permission
+    AcePermission = 'mechanic.admin',
+}
+```

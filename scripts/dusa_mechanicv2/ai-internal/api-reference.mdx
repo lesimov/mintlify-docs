@@ -1,0 +1,374 @@
+---
+title: "API Reference"
+description: "Complete API reference for dusa_mechanicv2 callbacks, exports, events, and NUI communication"
+---
+
+# API Reference
+
+This document provides a complete reference of all APIs available in dusa_mechanicv2 for AI assistants to understand how different parts communicate.
+
+## Server Callbacks (lib.callback)
+
+All server callbacks use ox_lib's callback system. Pattern:
+
+```lua
+-- Server registration
+lib.callback.register('mechanic:namespace:action', function(source, data)
+    -- Validate permissions
+    -- Process request
+    return { success = true, data = result }
+end)
+
+-- Client call
+local result = lib.callback.await('mechanic:namespace:action', false, data)
+```
+
+### Tablet Callbacks
+
+#### Orders
+
+| Callback | Parameters | Returns | Permission |
+|----------|------------|---------|------------|
+| `mechanic:tablet:getOrders` | `{ status?, page, limit }` | `{ orders[], total }` | canViewOrders |
+| `mechanic:tablet:getOrder` | `{ orderId }` | `{ order, items[] }` | canViewOrders |
+| `mechanic:tablet:createOrder` | `{ plate, type, description }` | `{ orderId }` | canCreateOrder |
+| `mechanic:tablet:updateOrder` | `{ orderId, status, cost? }` | `{ success }` | canEditOrder |
+| `mechanic:tablet:deleteOrder` | `{ orderId }` | `{ success }` | canDeleteOrder |
+| `mechanic:tablet:assignOrder` | `{ orderId, employeeId }` | `{ success }` | canManageShop |
+
+#### Employees
+
+| Callback | Parameters | Returns | Permission |
+|----------|------------|---------|------------|
+| `mechanic:tablet:getEmployees` | `{ includeInactive? }` | `{ employees[] }` | canViewEmployees |
+| `mechanic:tablet:hireEmployee` | `{ identifier, grade, salary }` | `{ employeeId }` | canHireEmployee |
+| `mechanic:tablet:fireEmployee` | `{ employeeId }` | `{ success }` | canFireEmployee |
+| `mechanic:tablet:updateEmployee` | `{ employeeId, grade?, salary? }` | `{ success }` | canManageShop |
+| `mechanic:tablet:getOnlineMembers` | `{}` | `{ members[] }` | canViewEmployees |
+
+#### Shop Management
+
+| Callback | Parameters | Returns | Permission |
+|----------|------------|---------|------------|
+| `mechanic:tablet:getShopInfo` | `{}` | `{ shop, stats }` | view |
+| `mechanic:tablet:updateShopSettings` | `{ settings }` | `{ success }` | isShopOwner |
+| `mechanic:tablet:getTransactions` | `{ page, limit, type? }` | `{ transactions[] }` | canManageShop |
+| `mechanic:tablet:withdrawFunds` | `{ amount }` | `{ success, newBalance }` | isShopOwner |
+| `mechanic:tablet:depositFunds` | `{ amount }` | `{ success, newBalance }` | canManageShop |
+
+### Tuning Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:tuning:getAvailableMods` | `{ vehicleNetId }` | `{ mods[], prices }` |
+| `mechanic:tuning:getModPrice` | `{ vehicleNetId, modType, modIndex }` | `{ price, basePrice }` |
+| `mechanic:tuning:purchase` | `{ vehicleNetId, mods[], totalPrice }` | `{ success, appliedMods }` |
+| `mechanic:tuning:getVehicleValue` | `{ vehicleNetId }` | `{ value, class }` |
+| `mechanic:tuning:createOrder` | `{ vehicleNetId, mods[], notes }` | `{ orderId }` |
+| `mechanic:tuning:applyOrder` | `{ orderId }` | `{ success }` |
+
+### Assembly Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:assembly:start` | `{ vehicleNetId, tasks[] }` | `{ assemblyId, tasks }` |
+| `mechanic:assembly:startTask` | `{ assemblyId, taskId }` | `{ taskData, skillChecks }` |
+| `mechanic:assembly:completeTask` | `{ assemblyId, taskId }` | `{ success, assemblyComplete }` |
+| `mechanic:assembly:getProgress` | `{ assemblyId }` | `{ progress, completedTasks }` |
+| `mechanic:assembly:cancel` | `{ assemblyId }` | `{ success }` |
+
+### Craft Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:craft:getRecipes` | `{ category? }` | `{ recipes[] }` |
+| `mechanic:craft:start` | `{ recipeId }` | `{ success, craftTime, skillCheck }` |
+| `mechanic:craft:complete` | `{ recipeId, skillCheckPassed }` | `{ success, item, count }` |
+| `mechanic:craft:fakePlate` | `{ plateText }` | `{ success, plateText }` |
+| `mechanic:craft:nitroKit` | `{}` | `{ success }` |
+
+### Illegal Network Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:redline:getProfile` | `{}` | `{ profile }` |
+| `mechanic:redline:createProfile` | `{ alias }` | `{ profileId }` |
+| `mechanic:redline:scanVIN` | `{ vehicleNetId }` | `{ vinData, history, flags }` |
+| `mechanic:redline:scrubVIN` | `{ vehicleNetId }` | `{ success, newVIN }` |
+| `mechanic:redline:getListings` | `{ category?, page }` | `{ listings[] }` |
+| `mechanic:redline:createListing` | `{ item, price, quantity }` | `{ listingId }` |
+| `mechanic:redline:purchase` | `{ listingId }` | `{ success }` |
+| `mechanic:redline:getHeat` | `{}` | `{ heatLevel, heatName }` |
+
+### Admin Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:admin:createShop` | `{ name, location, jobName }` | `{ shopId }` |
+| `mechanic:admin:deleteShop` | `{ shopId }` | `{ success }` |
+| `mechanic:admin:createZone` | `{ shopId, zoneType, coords }` | `{ zoneId }` |
+| `mechanic:admin:updateZone` | `{ zoneId, coords?, settings? }` | `{ success }` |
+| `mechanic:admin:deleteZone` | `{ zoneId }` | `{ success }` |
+| `mechanic:admin:createLift` | `{ shopId, coords, rotation }` | `{ liftId }` |
+| `mechanic:admin:getAllShops` | `{}` | `{ shops[] }` |
+| `mechanic:admin:getAllZones` | `{ shopId? }` | `{ zones[] }` |
+
+### Zone Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:zones:enter` | `{ zoneId, zoneType }` | `{ allowed, data }` |
+| `mechanic:zones:exit` | `{ zoneId }` | `{ success }` |
+| `mechanic:repair:start` | `{ vehicleNetId }` | `{ repairType, cost }` |
+| `mechanic:repair:complete` | `{ vehicleNetId }` | `{ success }` |
+| `mechanic:storage:open` | `{ zoneId }` | `{ stashId }` |
+
+### Stance Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:stance:get` | `{ plate }` | `{ stanceData }` |
+| `mechanic:stance:save` | `{ plate, frontCamber, rearCamber, ... }` | `{ success }` |
+| `mechanic:stance:apply` | `{ vehicleNetId, stanceData }` | `{ success }` |
+
+### Lift Callbacks
+
+| Callback | Parameters | Returns |
+|----------|------------|---------|
+| `mechanic:lift:getState` | `{ liftId }` | `{ position, isMoving }` |
+| `mechanic:lift:setPosition` | `{ liftId, position }` | `{ success }` |
+| `mechanic:lift:toggle` | `{ liftId }` | `{ success, newPosition }` |
+
+## Server Exports
+
+### Garage Integration
+
+```lua
+-- Check if vehicle is locked by mechanic (in assembly)
+local isLocked = exports.dusa_mechanicv2:IsVehicleLockedByMechanic(plate)
+-- Returns: boolean
+
+-- Get all locked vehicles
+local vehicles = exports.dusa_mechanicv2:GetLockedVehicles()
+-- Returns: { [plate] = { orderId, shopId, mechanicId } }
+
+-- Get vehicle order status
+local status = exports.dusa_mechanicv2:GetVehicleOrderStatus(plate)
+-- Returns: 'pending' | 'in_progress' | 'completed' | nil
+
+-- Get multiple vehicle statuses
+local statuses = exports.dusa_mechanicv2:GetVehicleOrderStatuses({ plate1, plate2 })
+-- Returns: { [plate] = status }
+
+-- Check for pending mods (race condition prevention)
+local hasPending = exports.dusa_mechanicv2:HasPendingMods(plate)
+-- Returns: boolean
+
+-- Get pending mods data
+local mods = exports.dusa_mechanicv2:GetPendingMods(plate)
+-- Returns: { modType = modIndex, ... } or nil
+
+-- Apply pending mods to spawned vehicle
+exports.dusa_mechanicv2:ApplyPendingMods(vehicleEntity, plate)
+
+-- Check if vehicle is currently in assembly
+local inAssembly = exports.dusa_mechanicv2:IsVehicleInAssembly(plate)
+-- Returns: boolean
+```
+
+### Debug Exports
+
+```lua
+-- Get current debug level
+local level = exports.dusa_mechanicv2:getDebugLevel()
+-- Returns: 1-7 (TRACE to SILENT)
+
+-- Set debug level
+exports.dusa_mechanicv2:setDebugLevel(3) -- INFO
+
+-- Get debug categories
+local categories = exports.dusa_mechanicv2:getDebugCategories()
+-- Returns: { 'tuning', 'tablet', ... }
+
+-- Get logger instance
+local logger = exports.dusa_mechanicv2:getLogger()
+logger.info('CATEGORY', 'Message', { data = value })
+```
+
+### Admin Exports
+
+```lua
+-- Check if player is admin
+local isAdmin = exports.dusa_mechanicv2:isAdmin(source)
+-- Returns: boolean
+
+-- Run database migrations
+exports.dusa_mechanicv2:runMigrations()
+
+-- Get migration status
+local status = exports.dusa_mechanicv2:getMigrationStatus()
+-- Returns: { applied = [...], pending = [...] }
+```
+
+## Client Exports
+
+```lua
+-- Admin UI
+exports.dusa_mechanicv2:openAdminUI()
+exports.dusa_mechanicv2:closeAdminUI()
+local isOpen = exports.dusa_mechanicv2:isAdminUIOpen()
+
+-- Nitro system
+local isActive = exports.dusa_mechanicv2:isNitroActive()
+local status = exports.dusa_mechanicv2:getNitroStatus()
+-- Returns: { hasNitro, charges, maxCharges, cooldown }
+
+-- Blip refresh
+exports.dusa_mechanicv2:RefreshShopBlips()
+```
+
+## NUI Communication
+
+### Client → NUI (SendNUIMessage)
+
+```lua
+SendNUIMessage({
+    type = 'ACTION_NAME',
+    payload = { ... }
+})
+```
+
+Common message types:
+- `OPEN_TUNING` - Open tuning UI
+- `CLOSE_TUNING` - Close tuning UI
+- `TUNING_EXITED` - Tuning session ended
+- `ASSEMBLY_STARTED` - Assembly began
+- `ASSEMBLY_PROGRESS` - Progress update
+- `TASK_COMPLETED` - Task finished
+- `SKILL_CHECK_KEYS` - Show skill check
+- `NITRO_STATUS` - Nitro HUD update
+
+### NUI → Client (RegisterNUICallback)
+
+```lua
+RegisterNUICallback('mechanic:action', function(data, cb)
+    -- Process request
+    cb({ success = true, data = result })
+end)
+```
+
+Common callbacks in client/tablet_integration.lua:
+- `mechanic:getShopData`
+- `mechanic:getOrders`
+- `mechanic:createOrder`
+- `mechanic:getEmployees`
+- `mechanic:hireEmployee`
+- `mechanic:tuning:getMods`
+- `mechanic:tuning:applyPreview`
+- `mechanic:tuning:purchase`
+- `mechanic:assembly:start`
+- `mechanic:cameraSwipe`
+
+### React UI (postNui)
+
+```typescript
+// web/src/utils/nui.ts
+const result = await postNui('mechanic:action', { data })
+```
+
+## Server Events
+
+### Internal Events
+
+```lua
+-- Add heat for illegal activity
+TriggerEvent('mechanic:illegal:addHeat', source, activityType, amount)
+
+-- Notify shop employees
+TriggerEvent('mechanic:tablet:notifyShop', shopId, eventType, data)
+
+-- Log transaction
+TriggerEvent('mechanic:transaction:log', shopId, type, amount, description)
+```
+
+### Client Events (from server)
+
+```lua
+-- Nitro installed
+TriggerClientEvent('mechanic:nitro:installed', source, { vehicleNetId, charges })
+
+-- Nitro charge used
+TriggerClientEvent('mechanic:nitro:chargeUsed', source, { remaining })
+
+-- Assembly vehicle hidden (customer)
+TriggerClientEvent('mechanic:assembly:vehicleHidden', customerSource, plate)
+
+-- Assembly completed (customer)
+TriggerClientEvent('mechanic:assembly:completed', customerSource, { plate, pickupCoords })
+```
+
+## Permission Checks
+
+All permission checks are in `server/tablet/permissions.lua`:
+
+```lua
+TabletPermissions.canViewOrders(source)
+TabletPermissions.canCreateOrder(source)
+TabletPermissions.canEditOrder(source, orderId)
+TabletPermissions.canDeleteOrder(source, orderId)
+TabletPermissions.canViewEmployees(source)
+TabletPermissions.canHireEmployee(source)
+TabletPermissions.canFireEmployee(source, employeeId)
+TabletPermissions.canManageShop(source, shopId)
+TabletPermissions.canAccessTuning(source)
+TabletPermissions.canApplyMods(source)
+TabletPermissions.isShopOwner(source, shopId)
+TabletPermissions.isAdmin(source)
+TabletPermissions.getPlayerShopId(source)
+TabletPermissions.getPlayerGrade(source)
+TabletPermissions.hasPermission(source, permissionName)
+```
+
+## Validation Helpers
+
+```lua
+-- Standard error responses
+TabletValidation.permissionDeniedError()
+TabletValidation.notFoundError(entityName)
+TabletValidation.invalidDataError(message)
+TabletValidation.serverError()
+
+-- Input sanitization
+TabletValidation.sanitizeString(input, maxLength)
+TabletValidation.sanitizePlate(plate)
+TabletValidation.sanitizeNumber(input, min, max)
+
+-- Validation functions
+TabletValidation.validateOrder(data)
+TabletValidation.validateEmployee(data)
+TabletValidation.validatePrice(clientPrice, serverPrice)
+TabletValidation.validatePagination(data)
+```
+
+## Logging
+
+```lua
+-- Server logging (MechanicLogger global)
+MechanicLogger.trace('CATEGORY', 'Message', { data })
+MechanicLogger.debug('CATEGORY', 'Message', { data })
+MechanicLogger.info('CATEGORY', 'Message', { data })
+MechanicLogger.warn('CATEGORY', 'Message', { data })
+MechanicLogger.error('CATEGORY', 'Message', { data })
+MechanicLogger.fatal('CATEGORY', 'Message', { data })
+
+-- Timer tracking
+MechanicLogger.startTimer('operationName')
+local duration = MechanicLogger.endTimer('operationName', 'CATEGORY')
+
+-- Client logging (ClientDebug global)
+ClientDebug.trace('CATEGORY', 'Message', { data })
+ClientDebug.debug('CATEGORY', 'Message', { data })
+-- ... same levels as server
+```
+
+Common categories: `TABLET`, `TUNING`, `ASSEMBLY`, `CRAFT`, `ILLEGAL`, `DATABASE`, `ADMIN`, `ZONES`

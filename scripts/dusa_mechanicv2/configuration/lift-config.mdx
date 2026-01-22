@@ -1,0 +1,95 @@
+---
+title: "Lift Configuration"
+description: "6 parçalı hidrolik lift sistemi yapılandırması - shared/config.lifts.lua"
+---
+
+# Lift Yapılandırması
+
+`shared/config.lifts.lua` dosyası 6 parçalı hidrolik araç lift sisteminin ayarlarını içerir.
+
+## Temel Ayarlar
+
+```lua
+LiftConfig = {
+    defaultModel = 'spray_jack_lift',
+    minHeight = 0.0,        -- Tamamen indirilmiş
+    maxHeight = 2.0,        -- Tamamen kaldırılmış
+    liftSpeed = 0.01,       -- Normal hız
+    liftSpeedSlow = 0.005,  -- Limitlere yakın hız
+    zoneSize = vector3(6.0, 6.0, 10.0),
+    interactionKey = 38,    -- E tuşu
+    interactionPrompt = 'zones.lift.prompt',
+    freezeEntity = true,
+    entityAlpha = 255,
+    modelLoadTimeout = 5000,
+    useGlobalState = true,
+}
+```
+
+## Lift Modelleri
+
+```lua
+LiftModels = {
+    ['spray_jack_lift'] = {
+        name = 'Hydraulic Lift',
+        category = 'standard',
+        platform = 'prop_spray_jackframe',
+        pole = 'prop_spray_jackleg',
+        elecBox = 'prop_elecbox_02b',
+        platformHeadingOffset = 0.0,
+        poleCount = 4,
+        poleZOffset = -0.30,
+        poleOffsets = {
+            { x = 1.43, y = 2.880 },   -- Ön-Sağ
+            { x = -1.43, y = 2.880 },  -- Ön-Sol
+            { x = -1.43, y = -2.880 }, -- Arka-Sol
+            { x = 1.43, y = -2.880 },  -- Arka-Sağ
+        },
+        elecBoxOffset = { x = 2.5, y = 0.0, z = 0.0 },
+    },
+}
+```
+
+## 6 Parça Yapısı
+
+Her lift şu parçalardan oluşur:
+
+| Parça | Model | Açıklama |
+|-------|-------|----------|
+| Platform | `prop_spray_jackframe` | Hareket eden platform |
+| Pole (x4) | `prop_spray_jackleg` | 4 köşe direk |
+| Control Box | `prop_elecbox_02b` | Kontrol kutusu |
+
+## Helper Fonksiyonları
+
+```lua
+-- Lift model bilgisi al
+local info = GetLiftModelInfo('spray_jack_lift')
+
+-- Tüm modelleri listele
+local models = GetAllLiftModels()
+
+-- Kategoriye göre filtrele
+local standard = GetLiftModelsByCategory('standard')
+
+-- Model geçerliliği kontrol et
+if IsValidLiftModel('spray_jack_lift') then ... end
+
+-- Spawn için prop bilgisi al
+local props = GetLiftProps('spray_jack_lift')
+
+-- Direk pozisyonlarını hesapla
+local positions = CalculatePolePositions(x, y, z, heading, props.poleOffsets, props.poleZOffset)
+
+-- Kontrol kutusu pozisyonunu hesapla
+local elecBoxPos = CalculateElecBoxPosition(x, y, z, heading, props.elecBoxOffset)
+```
+
+## Storage Ayarları
+
+```lua
+StorageConfig = {
+    defaultSlots = 50,
+    defaultWeight = 100000,
+}
+```

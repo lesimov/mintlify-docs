@@ -1,0 +1,147 @@
+---
+title: "Assembly Configuration"
+description: "Hibrit montaj sistemi yapılandırması - shared/config.assembly.lua"
+---
+
+# Assembly Yapılandırması
+
+`shared/config.assembly.lua` dosyası task-bazlı montaj sisteminin ayarlarını içerir.
+
+## Temel Ayarlar
+
+```lua
+MechanicConfig.Assembly = {
+    Enabled = true,
+    MaxDistanceToZone = 100.0,  -- Zone mesafesi
+}
+```
+
+## Skill Check Ayarları
+
+```lua
+MechanicConfig.Assembly.SkillCheck = {
+    BaseDifficulty = 30,        -- 1-100 zorluk
+    DurationPerDifficulty = 50, -- ms/zorluk
+    SpeedMultiplier = 0.8,      -- Hız çarpanı
+    ChecksPerPart = 2,          -- Parça başı kontrol
+    Keys = {'w', 'a', 's', 'd'},
+}
+```
+
+## Toplu Montaj (Batch Install)
+
+```lua
+MechanicConfig.Assembly.BatchInstall = {
+    DurationPerTask = 3000,         -- ms/görev
+    RequiredRole = 'veteran',       -- Minimum rol
+    BossSpeedMultiplier = 0.66,     -- Boss hız bonusu
+}
+```
+
+## Parça Kutusu Ayarları
+
+```lua
+MechanicConfig.Assembly.PartsBox = {
+    Model = 'prop_devin_box_01',
+    Offset = vector3(2.5, 0.0, 0.0),
+    Heading = 0.0,
+}
+```
+
+## Bone Mapping
+
+Her mod tipi için araç bone eşlemesi:
+
+```lua
+MechanicConfig.Assembly.BoneMapping = {
+    [11] = { bone = 'bonnet', label = 'Motor', icon = 'fa-solid fa-gear' },
+    [12] = { bone = 'wheel_lf', label = 'Frenler', icon = 'fa-solid fa-circle' },
+    [18] = { bone = 'engine', label = 'Turbo', icon = 'fa-solid fa-wind' },
+    wheels = {
+        bones = {'wheel_lf', 'wheel_rf', 'wheel_lr', 'wheel_rr'},
+        label = 'Jant',
+        icon = 'fa-solid fa-circle-notch'
+    },
+    paint = {
+        bone = 'chassis',
+        label = 'Boya',
+        icon = 'fa-solid fa-spray-can'
+    },
+}
+```
+
+## Parça Props ve Mini Oyunlar
+
+```lua
+MechanicConfig.Assembly.PartProps = {
+    [11] = {  -- Motor
+        prop = 'prop_car_engine_01',
+        difficulty = 40,
+        hasAnimation = true,
+        checkboxes = { 
+            'Fuel Injection System', 
+            'Air Intake Module', 
+            'ECU Remap Configuration' 
+        },
+        animDict = 'mini@repair',
+        anim = 'fixing_a_ped',
+    },
+    paint = {
+        prop = 'prop_spray_can_01',
+        difficulty = 20,
+        useProgressBar = true,
+        progressDuration = 10000,
+        animDict = 'anim@scripted@freemode@postertag@graffiti_spray@male@',
+        anim = 'spray_can_var_01_male',
+        particle = {
+            dict = 'core',
+            name = 'ent_amb_spray_can',
+            bone = 28422,
+            scale = 0.7,
+        },
+    },
+}
+```
+
+## Anında Uygulanan Kategoriler
+
+Mini oyun gerektirmeyen modlar:
+
+```lua
+MechanicConfig.Assembly.InstantApplyCategories = {
+    'WINDOW_TINT',
+    'PLATE_INDEX',
+    14,  -- Korna
+    'LIVERY',
+    22,  -- Xenon
+    -- İç mekan modları (27-38, 45-47)
+}
+```
+
+## Vehicle Visibility
+
+Müşteri aracını montaj sırasında gizleme:
+
+```lua
+MechanicConfig.Assembly.VehicleVisibility = {
+    Enabled = true,
+    SearchRadius = 100.0,
+    HideUndergroundOffset = -100.0,
+    MaxRetryAttempts = 2,
+}
+```
+
+## Pending Mods
+
+Garaj senkronizasyonu için bekleyen modlar:
+
+```lua
+MechanicConfig.Assembly.PendingMods = {
+    Enabled = true,
+    ExpiryHours = 24,
+    MaxApplyAttempts = 3,
+    ApplyCooldown = 300000,  -- 5 dakika
+    SaveBackToDB = true,
+    ShowNotification = true,
+}
+```

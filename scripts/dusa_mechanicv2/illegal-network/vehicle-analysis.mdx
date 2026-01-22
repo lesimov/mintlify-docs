@@ -1,0 +1,359 @@
+---
+title: "Vehicle Analysis"
+description: "VIN scanning, vehicle history checks, and stolen vehicle detection"
+---
+
+# Vehicle Analysis
+
+The vehicle analysis system provides tools for scanning vehicles, checking histories, and managing VIN information through the Redline Network.
+
+## Overview
+
+Vehicle analysis features:
+
+1. **VIN Scanner** - Scan vehicle identification numbers
+2. **History Check** - View vehicle modification history
+3. **Stolen Check** - Detect stolen or flagged vehicles
+4. **VIN Scrubbing** - Remove vehicle history (illegal)
+
+## VIN Scanner
+
+### Client-Side Scanner
+
+```lua
+-- Start VIN scan
+function VehicleAnalysis.startScan(vehicle)
+    if not vehicle or not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Invalid vehicle' }
+    end
+
+    -- Play scanning animation
+    lib.requestAnimDict('amb@code_human_police_investigate@idle_a')
+    TaskPlayAnim(cache.ped, 'amb@code_human_police_investigate@idle_a', 'idle_b', 8.0, -8.0, -1, 49, 0, false, false, false)
+
+    -- Progress bar
+    local completed = lib.progressBar({
+        duration = 5000,
+        label = 'Scanning VIN...',
+        useWhileDead = false,
+        canCancel = true,
+        disable = {
+            move = true,
+            car = true,
+            combat = true,
+        },
+    })
+
+    ClearPedTasks(cache.ped)
+
+    if not completed then
+        return { success = false, error = 'Scan cancelled' }
+    end
+
+    -- Request scan from server
+    local result = lib.callback.await('mechanic:redline:scanVIN', false, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+    })
+
+    return result
+end
+```
+
+### Server-Side Processing
+
+```lua
+lib.callback.register('mechanic:redline:scanVIN', function(source, data)
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    if not DoesEntityExist(vehicle) then
+        return { success = false, error = 'Vehicle not found' }
+    end
+
+    local plate = GetVehicleNumberPlateText(vehicle)
+    local model = GetEntityModel(vehicle)
+
+    -- Get vehicle data
+    local vinData = VehicleAnalysis.getVINData(plate)
+    local history = VehicleAnalysis.getHistory(plate)
+    local flags = VehicleAnalysis.checkFlags(plate)
+
+    -- Add heat for scanning (minor)
+    TriggerEvent('mechanic:illegal:addHeat', source, 'vin_scan', 2)
+
+    return {
+        success = true,
+        data = {
+            vin = vinData.vin or VehicleAnalysis.generateVIN(plate, model),
+            plate = plate,
+            model = GetDisplayNameFromVehicleModel(model),
+            originalOwner = vinData.originalOwner,
+            currentOwner = vinData.currentOwner,
+            registrationDate = vinData.registrationDate,
+            history = history,
+            flags = flags,
+            isClean = #flags == 0,
+        },
+    }
+end)
+```
+
+## Vehicle History
+
+### History Data Structure
+
+```lua
+local historyEntry = {
+    date = timestamp,
+    action = 'modification',      -- Type of action
+    description = 'Engine swap', -- Human-readable description
+    location = 'Shop Name',      -- Where it happened
+    performedBy = 'alias',       -- Who did it (if known)
+    value = 50000,               -- Associated value
+}
+```
+
+### Checking History
+
+```lua
+-- Get full vehicle history
+function VehicleAnalysis.getHistory(plate)
+    local history = MySQL.query.await([[
+        SELECT * FROM ds_mechanic_vehicle_history
+        WHERE plate = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+    ]], { plate })
+
+    return history or {}
+end
+
+-- Add history entry
+function VehicleAnalysis.addHistory(plate, entry)
+    MySQL.insert.await([[
+        INSERT INTO ds_mechanic_vehicle_history
+        (plate, action, description, location, performed_by, value)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ]], {
+        plate,
+        entry.action,
+        entry.description,
+        entry.location,
+        entry.performedBy,
+        entry.value,
+    })
+end
+```
+
+## Stolen Vehicle Detection
+
+### Flag Types
+
+```lua
+VehicleFlags = {
+    STOLEN = 'stolen',                    -- Reported stolen
+    FAKE_PLATE = 'fake_plate',            -- Fake plates detected
+    VIN_MISMATCH = 'vin_mismatch',        -- VIN doesn't match plate
+    SUSPICIOUS_MODS = 'suspicious_mods', -- Illegal modifications
+    INSURANCE_VOID = 'insurance_void',   -- Insurance invalidated
+    POLICE_INTEREST = 'police_interest', -- Under investigation
+}
+```
+
+### Checking Flags
+
+```lua
+function VehicleAnalysis.checkFlags(plate)
+    local flags = {}
+
+    -- Check stolen database
+    local stolen = MySQL.single.await([[
+        SELECT * FROM ds_mechanic_stolen_vehicles WHERE plate = ?
+    ]], { plate })
+
+    if stolen then
+        table.insert(flags, {
+            type = VehicleFlags.STOLEN,
+            date = stolen.reported_at,
+            severity = 'high',
+        })
+    end
+
+    -- Check for fake plate
+    local fakePlate = FakePlate.isFakePlate(plate)
+    if fakePlate then
+        table.insert(flags, {
+            type = VehicleFlags.FAKE_PLATE,
+            severity = 'high',
+        })
+    end
+
+    -- Check for suspicious mods
+    local mods = VehicleAnalysis.getIllegalMods(plate)
+    if #mods > 0 then
+        table.insert(flags, {
+            type = VehicleFlags.SUSPICIOUS_MODS,
+            count = #mods,
+            severity = 'medium',
+        })
+    end
+
+    return flags
+end
+```
+
+## VIN Scrubbing (Illegal)
+
+### Scrub Service
+
+```lua
+-- Request VIN scrub (clears vehicle history)
+lib.callback.register('mechanic:redline:scrubVIN', function(source, data)
+    local profile = RedlineProfiles.get(source)
+    if not profile or profile.level < 3 then
+        return { success = false, error = 'Insufficient network level' }
+    end
+
+    local vehicle = NetworkGetEntityFromNetworkId(data.vehicleNetId)
+    local plate = GetVehicleNumberPlateText(vehicle)
+
+    -- Check player has required items or payment
+    local cost = MechanicConfig.IllegalNetwork.VINScrubCost
+    local player = Framework.GetPlayer(source)
+
+    if player.GetMoney('cash') < cost then
+        return { success = false, error = 'Insufficient funds' }
+    end
+
+    -- Process payment
+    player.RemoveMoney('cash', cost, 'VIN scrub service')
+
+    -- Clear vehicle history
+    VehicleAnalysis.clearHistory(plate)
+
+    -- Generate new VIN
+    local newVIN = VehicleAnalysis.generateCleanVIN()
+    VehicleAnalysis.setVIN(plate, newVIN)
+
+    -- Add significant heat
+    TriggerEvent('mechanic:illegal:addHeat', source, 'vin_scrubbed', 25)
+
+    -- Add reputation
+    RedlineProfiles.addReputation(source, 50)
+
+    MechanicLogger.info('ILLEGAL', 'VIN scrubbed', {
+        plate = plate,
+        newVIN = newVIN,
+        source = source,
+    })
+
+    return {
+        success = true,
+        newVIN = newVIN,
+        message = 'Vehicle history cleared',
+    }
+end)
+```
+
+### Clear History
+
+```lua
+function VehicleAnalysis.clearHistory(plate)
+    -- Archive old history (for potential recovery)
+    MySQL.query.await([[
+        INSERT INTO ds_mechanic_vehicle_history_archive
+        SELECT *, NOW() as archived_at FROM ds_mechanic_vehicle_history
+        WHERE plate = ?
+    ]], { plate })
+
+    -- Delete history
+    MySQL.query.await([[
+        DELETE FROM ds_mechanic_vehicle_history WHERE plate = ?
+    ]], { plate })
+
+    -- Clear flags
+    MySQL.query.await([[
+        DELETE FROM ds_mechanic_vehicle_flags WHERE plate = ?
+    ]], { plate })
+end
+```
+
+## Client UI Integration
+
+### NUI Callbacks
+
+```lua
+-- Scan nearby vehicle
+RegisterNUICallback('mechanic:redline:scanVehicle', function(data, cb)
+    local vehicle = lib.getClosestVehicle(GetEntityCoords(cache.ped), 5.0)
+
+    if not vehicle then
+        cb({ success = false, error = 'No vehicle nearby' })
+        return
+    end
+
+    local result = VehicleAnalysis.startScan(vehicle)
+    cb(result)
+end)
+
+-- Get scan results for UI
+RegisterNUICallback('mechanic:redline:getScanResults', function(data, cb)
+    local result = lib.callback.await('mechanic:redline:getLastScan', false, {
+        plate = data.plate,
+    })
+    cb(result)
+end)
+
+-- Request VIN scrub
+RegisterNUICallback('mechanic:redline:requestScrub', function(data, cb)
+    local vehicle = cache.vehicle or lib.getClosestVehicle(GetEntityCoords(cache.ped), 3.0)
+
+    if not vehicle then
+        cb({ success = false, error = 'No vehicle' })
+        return
+    end
+
+    local result = lib.callback.await('mechanic:redline:scrubVIN', false, {
+        vehicleNetId = NetworkGetNetworkIdFromEntity(vehicle),
+    })
+    cb(result)
+end)
+```
+
+## Database Schema
+
+```sql
+-- Vehicle history
+CREATE TABLE ds_mechanic_vehicle_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    description TEXT,
+    location VARCHAR(64),
+    performed_by VARCHAR(64),
+    value INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plate (plate)
+);
+
+-- Vehicle flags
+CREATE TABLE ds_mechanic_vehicle_flags (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plate VARCHAR(16) NOT NULL,
+    flag_type VARCHAR(32) NOT NULL,
+    severity VARCHAR(16) DEFAULT 'medium',
+    details JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plate (plate)
+);
+
+-- VIN data
+CREATE TABLE ds_mechanic_vehicle_vin (
+    plate VARCHAR(16) PRIMARY KEY,
+    vin VARCHAR(32) NOT NULL UNIQUE,
+    original_owner VARCHAR(64),
+    current_owner VARCHAR(64),
+    registration_date DATE,
+    is_scrubbed TINYINT(1) DEFAULT 0,
+    scrubbed_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
